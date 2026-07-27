@@ -96,32 +96,31 @@ def main():
     print(f"  torch {torch.__version__} | {total/1e9:.0f} GB | SDPA enable_gqa={M._SDPA_HAS_GQA}")
     print("=" * 78)
 
+    # compile already proven ~1.7x, so sweep COMPILED configs only and settle both
+    # context lengths in one pass. Anything left unmeasured here becomes a guess
+    # baked into a multi-hundred-dollar run, so cover the whole decision space.
     results = []
-    print("\n--- eager baseline: how does micro-batch scale? ---")
-    for mb in (8, 16, 24, 32, 48, 64):
-        r = bench(a.preset, 1024, mb, None, a.steps)
-        if r:
-            results.append(r)
-        elif mb > 8:
-            break
-
-    best_eager = max((r for r in results), key=lambda r: r["tok_s"], default=None)
-
-    print("\n--- torch.compile at the best eager batch (and one larger) ---")
-    if best_eager:
-        for mb in (best_eager["mb"], best_eager["mb"] * 2):
-            for mode in ("default", "max-autotune"):
-                r = bench(a.preset, 1024, mb, mode, a.steps)
-                if r:
-                    results.append(r)
-
-    print("\n--- ctx 2048 (the real run's target context) ---")
-    if best_eager:
-        half = max(1, best_eager["mb"] // 2)
-        for mode in (None, "default"):
-            r = bench(a.preset, 2048, half, mode, a.steps)
+    for ctx in (1024, 2048):
+        print(f"\n--- ctx {ctx}: micro-batch scaling (compiled) ---")
+        oom = False
+        for mb in (8, 12, 16, 24, 32, 48, 64):
+            if oom:
+                break
+            r = bench(a.preset, ctx, mb, "default", a.steps)
             if r:
                 results.append(r)
+            else:
+                oom = True   # bigger will only be worse
+
+    if not results:
+        sys.exit("every config failed")
+
+    # max-autotune is slow to compile; only worth it on the winner.
+    top = max(results, key=lambda r: r["tok_s"])
+    print(f"\n--- max-autotune on the winner (mb={top['mb']} ctx={top['ctx']}) ---")
+    r = bench(a.preset, top["ctx"], top["mb"], "max-autotune", a.steps)
+    if r:
+        results.append(r)
 
     best = max(results, key=lambda r: r["tok_s"])
     peak_tflops = {"H100": 989, "H200": 989, "A100": 312, "4090": 165}
@@ -140,7 +139,7 @@ def main():
     if base:
         print(f"  vs the smoke-run config (mb24/ctx1024/eager): "
               f"{best['tok_s']/base['tok_s']:.2f}x")
-    for D, lbl in ((20e9, "20B"), (50e9, "50B"), (100e9, "100B")):
+    for D, lbl in ((20e9, "20B"), (50e9, "50B")):
         h = D / best["tok_s"] / 3600
         print(f"    {lbl:>4s}: {h:6.1f} h  =  ${h*2.99:7.0f} at $2.99/hr")
 
