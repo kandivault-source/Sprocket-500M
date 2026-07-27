@@ -210,8 +210,21 @@ if rpath:
         print(f"  ! RNG restore failed ({e}) — continuing with a fresh stream", flush=True)
 
     if start_it > A.max_iters:
-        sys.exit(f"checkpoint is at iter {ck.get('it')} but --max-iters is {A.max_iters}; "
-                 f"raise --max-iters to continue")
+        # Already finished. Exit 0, not an error — an orchestrator re-running the
+        # pipeline (to redo a later stage) must not be blocked by a completed one.
+        print(f"already complete: checkpoint at iter {ck.get('it')} >= --max-iters "
+              f"{A.max_iters}. Nothing to do. (Raise --max-iters to train further.)",
+              flush=True)
+        # save_ckpt() is defined further down; write the final inline.
+        final = os.path.join(A.ckpt_dir, f"{A.preset}_final.pt")
+        if not os.path.exists(final):
+            tmp = final + ".tmp"
+            torch.save({"model": raw_model.state_dict(), "it": ck.get("it", 0),
+                        "cfg": cfg.__dict__, "tokens_done": tokens_done,
+                        "history": history, "args": vars(A)}, tmp)
+            os.replace(tmp, final)
+            print(f"  wrote missing {final}", flush=True)
+        sys.exit(0)
     print(f"RESUMED {rpath} at iter {start_it}/{A.max_iters} "
           f"({tokens_done/1e9:.3f}B tokens done, lr will be {lr_at(start_it):.2e})", flush=True)
 else:
