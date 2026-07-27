@@ -15,11 +15,11 @@
 #   REPO_URL      git repo to clone                       (required)
 #   HF_TOKEN      HuggingFace write token, for the push   (required to publish)
 #   HF_REPO       target model repo, e.g. you/sprocket-500m
-#   TOKENS        pretrain token budget      (default 50000000000)
+#   TOKENS        pretrain token budget      (default 20000000000)
 #   SUBSET        FineWeb-Edu subset         (default sample/100BT)
 #   PRESET        model preset               (default 500m)
 #   CTX           context length             (default 2048)
-#   MICRO_BATCH   per-step micro batch       (default 12 at ctx2048)
+#   MICRO_BATCH   per-step micro batch       (default 16 - MEASURED best safe)
 #   GRAD_ACCUM    gradient accumulation      (default 4)
 #   MAX_ITERS     pretrain steps             (default 0 = derive from TOKENS)
 #   AUTO_STOP     terminate pod when done    (default 1)
@@ -28,17 +28,25 @@ set -euo pipefail
 
 WORK=/workspace
 REPO_URL="${REPO_URL:?set REPO_URL}"
-TOKENS="${TOKENS:-50000000000}"
+TOKENS="${TOKENS:-20000000000}"
 SUBSET="${SUBSET:-sample/100BT}"
 PRESET="${PRESET:-500m}"
 CTX="${CTX:-2048}"
-MICRO_BATCH="${MICRO_BATCH:-12}"
+MICRO_BATCH="${MICRO_BATCH:-16}"
 GRAD_ACCUM="${GRAD_ACCUM:-4}"
 MAX_ITERS="${MAX_ITERS:-0}"
 AUTO_STOP="${AUTO_STOP:-1}"
 HF_REPO="${HF_REPO:-}"
 
 MAX_HOURS="${MAX_HOURS:-200}"
+# MEASURED on H100 80GB, 500m, torch 2.8 + compile + enable_gqa (11 configs):
+#   ctx1024 mb48 130,584 tok/s  75.3GB   ctx2048 mb24 117,730 tok/s  75.3GB
+#   ctx1024 mb32 127,464 tok/s  52.6GB   ctx2048 mb16 115,295 tok/s  52.6GB  <-- DEFAULT
+#   ctx1024 mb24 125,689 tok/s  41.2GB   ctx2048 mb12 113,403 tok/s  41.2GB
+# ctx2048 costs ~10% throughput vs ctx1024 and is worth it: a 1024-token chat
+# model is barely usable. mb16 over mb24 trades 2% speed for 23GB of headroom,
+# which matters across a 48h run where fragmentation can OOM a tight config.
+# 20B tokens @ 115,295 tok/s = 48.2 h = $144 at $2.99/hr.
 # torch.compile: MEASURED 1.70x on H100 (73,252 -> 126,226 tok/s) and it also cuts
 # VRAM 62 -> 43 GB. Needs an image with torch >= 2.5 (use the 2.8 image) - leave
 # COMPILE=0 only if compilation itself fails. Costs ~2 min of warmup, once.
