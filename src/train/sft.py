@@ -1,11 +1,11 @@
-"""SFT / instruct stage — fine-tune a pretrained base checkpoint on the chat corpus.
+"""SFT / instruct stage â€” fine-tune a pretrained base checkpoint on the chat corpus.
 
 Differs from pretraining in four ways that matter:
   1. Starts from a base checkpoint (--base), with a FRESH optimizer. Carrying the
      pretrain Adam state into SFT drags the model back toward the web distribution.
   2. Much lower LR (2e-5 vs 6e-4). SFT is style/format adaptation, not learning
      language; a pretrain LR here will wreck the base model's knowledge.
-  3. Loss on assistant spans only — see src/train/sft_data.py. That module's
+  3. Loss on assistant spans only â€” see src/train/sft_data.py. That module's
      --self-test is the guard; run it if you touch the template.
   4. Epochs over a small corpus (2-4), not a single pass over a huge one. For
      style, repeated exposure matters more than unique tokens.
@@ -65,6 +65,9 @@ def parse_args():
     p.add_argument("--resume", default=None)
     p.add_argument("--ckpt-minutes", type=float, default=15.0)
     p.add_argument("--device", default="cuda")
+    p.add_argument("--compile", action="store_true",
+                   help="torch.compile â€” measured 1.7x on H100. Linux only; "
+                        "inductor needs a C compiler, so it is a no-op risk on Windows.")
     return p.parse_args()
 
 
@@ -137,6 +140,7 @@ def get_batch(split="train"):
 # ------------------------------------------------------------------ model
 cfg = replace(PRESETS[A.preset], max_seq_len=A.ctx, dropout=0.0)
 model = GPT(cfg).to(device)
+raw_model = model          # state_dict/generate must go through the uncompiled module
 n_params = model.num_params()
 print(f"model {A.preset}: {n_params/1e6:.1f}M params", flush=True)
 
@@ -147,8 +151,8 @@ if A.base and not A.resume:
     for k in ("dim", "n_layers", "n_heads", "n_kv_heads", "vocab_size"):
         if k in saved and saved[k] != getattr(cfg, k):
             sys.exit(f"base checkpoint mismatch: {k}={saved[k]} vs preset {getattr(cfg,k)}")
-    model.load_state_dict(ck["model"])
-    print(f"loaded BASE weights from {A.base} (iter {ck.get('it')}) — fresh optimizer",
+    raw_model.load_state_dict(ck["model"])
+    print(f"loaded BASE weights from {A.base} (iter {ck.get('it')}) â€” fresh optimizer",
           flush=True)
 elif not A.base and not A.resume:
     print("! no --base: fine-tuning from RANDOM init. Fine for a smoke test, "
@@ -176,7 +180,7 @@ def resolve(spec):
 rp = resolve(A.resume)
 if rp:
     ck = torch.load(rp, map_location=device, weights_only=False)
-    model.load_state_dict(ck["model"])
+    raw_model.load_state_dict(ck["model"])
     if "opt" in ck:
         opt.load_state_dict(ck["opt"])
     start_it = ck.get("it", 0) + 1
@@ -196,6 +200,11 @@ if rp:
     print(f"RESUMED {rp} at step {start_it}/{MAX_ITERS}", flush=True)
 
 
+if A.compile:
+    model = torch.compile(model)
+    print("torch.compile enabled (first steps will be slow while it compiles)", flush=True)
+
+
 @torch.no_grad()
 def evaluate():
     model.eval()
@@ -212,11 +221,11 @@ def evaluate():
 
 @torch.no_grad()
 def sample(prompt="What are you?"):
-    """Generate through the real chat template — same bytes the app will send."""
+    """Generate through the real chat template â€” same bytes the app will send."""
     model.eval()
     ids = tmpl.render_prompt([{"role": "user", "content": prompt}])
     idx = torch.tensor([ids], device=device)
-    out = model.generate(idx, 120, temperature=0.8, top_k=50)
+    out = raw_model.generate(idx, 120, temperature=0.8, top_k=50)
     model.train()
     gen = out[0].tolist()[len(ids):]
     if tmpl.end in gen:
@@ -239,7 +248,7 @@ def write_metrics(step, tr, val, lr, tps, peak, sample_text, eta, status="traini
 
 
 def save_ckpt(path, it, include_opt=True):
-    blob = {"model": model.state_dict(), "it": it, "cfg": cfg.__dict__,
+    blob = {"model": raw_model.state_dict(), "it": it, "cfg": cfg.__dict__,
             "history": history, "args": vars(A), "stage": "sft",
             "rng": {"torch": torch.get_rng_state(),
                     "cuda": torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None,
