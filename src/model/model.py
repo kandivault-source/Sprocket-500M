@@ -77,6 +77,22 @@ def apply_rope(x: torch.Tensor, cos: torch.Tensor, sin: torch.Tensor) -> torch.T
     return torch.cat([x1 * cos - x2 * sin, x2 * cos + x1 * sin], dim=-1)
 
 
+# torch >= 2.5 lets SDPA broadcast KV heads for GQA instead of us materialising
+# them. Probe once at import by actually calling it — inspect.signature() raises
+# on this C builtin, and a version-string check would be brittle across backends.
+def _probe_gqa() -> bool:
+    try:
+        q = torch.zeros(1, 2, 2, 8)
+        kv = torch.zeros(1, 1, 2, 8)
+        F.scaled_dot_product_attention(q, kv, kv, enable_gqa=True)
+        return True
+    except (TypeError, RuntimeError):
+        return False
+
+
+_SDPA_HAS_GQA = _probe_gqa()
+
+
 class Attention(nn.Module):
     def __init__(self, cfg: ModelConfig):
         super().__init__()
@@ -96,13 +112,23 @@ class Attention(nn.Module):
         k = self.wk(x).view(B, T, self.n_kv_heads, self.head_dim).transpose(1, 2)
         v = self.wv(x).view(B, T, self.n_kv_heads, self.head_dim).transpose(1, 2)
         q, k = apply_rope(q, cos, sin), apply_rope(k, cos, sin)
-        if self.rep > 1:                       # expand KV heads for GQA
-            k = k.repeat_interleave(self.rep, dim=1)
-            v = v.repeat_interleave(self.rep, dim=1)
-        out = F.scaled_dot_product_attention(
-            q, k, v, is_causal=True,
-            dropout_p=self.dropout if self.training else 0.0,
-        )
+        if self.rep > 1 and _SDPA_HAS_GQA:
+            # torch >= 2.5: SDPA broadcasts KV heads internally. The old path
+            # materialised a rep-times-larger K and V (20/4 = 5x here) — for the
+            # 500m at mb=24 that is ~3.3 GB of redundant tensors per step, plus
+            # the bandwidth to write and read them. No state-dict impact.
+            out = F.scaled_dot_product_attention(
+                q, k, v, is_causal=True, enable_gqa=True,
+                dropout_p=self.dropout if self.training else 0.0,
+            )
+        else:
+            if self.rep > 1:                   # expand KV heads for GQA (fallback)
+                k = k.repeat_interleave(self.rep, dim=1)
+                v = v.repeat_interleave(self.rep, dim=1)
+            out = F.scaled_dot_product_attention(
+                q, k, v, is_causal=True,
+                dropout_p=self.dropout if self.training else 0.0,
+            )
         out = out.transpose(1, 2).contiguous().view(B, T, C)
         return self.wo(out)
 
