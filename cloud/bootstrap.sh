@@ -124,6 +124,80 @@ mkdir -p "$WORK/data/processed" "$WORK/checkpoints"
 ln -sfn "$WORK/data/processed" data/processed
 ln -sfn "$WORK/checkpoints" checkpoints
 
+# ---------------------------------------------------------------- 2a. PREFLIGHT
+# Exercise EVERY dependency the run will eventually need, before spending a
+# single GPU-hour. The first smoke run pretrained and SFT'd for 16 minutes and
+# THEN died on a transformers/torch mismatch in the export step. On the real run
+# that same failure lands on day 5. Anything env-shaped must fail here, in ~60s.
+log "preflight: validating the whole toolchain before burning GPU time"
+python - <<'PY'
+import os, sys, tempfile
+fail = []
+
+def chk(name, fn):
+    try:
+        fn(); print(f"    ok   {name}")
+    except Exception as e:
+        print(f"    FAIL {name}: {type(e).__name__}: {e}")
+        fail.append(name)
+
+import torch
+chk("cuda available", lambda: (_ for _ in ()).throw(RuntimeError("no CUDA"))
+    if not torch.cuda.is_available() else None)
+
+# The exact import that killed the first run.
+def _tf():
+    import transformers
+    from transformers import LlamaConfig, LlamaForCausalLM  # noqa: F401
+    print(f"         transformers {transformers.__version__}, torch {torch.__version__}")
+chk("transformers LlamaForCausalLM import", _tf)
+
+def _tok():
+    from tokenizers import Tokenizer
+    t = Tokenizer.from_file("config/tokenizer/tokenizer.json")
+    assert t.get_vocab_size() == 32000, f"vocab {t.get_vocab_size()} != 32000"
+    for s, i in [("<think>", 8), ("</think>", 9),
+                 ("<|memory_read|>", 10), ("<|memory_write|>", 11)]:
+        got = t.encode(s, add_special_tokens=False).ids
+        assert got == [i], f"{s} -> {got}, expected [{i}]"
+chk("tokenizer special ids (8/9/10/11, vocab 32000)", _tok)
+
+def _sft():
+    sys.path.insert(0, "src")
+    from train.sft_data import ChatTemplate
+    ChatTemplate("config/tokenizer/tokenizer.json").render(
+        [{"role": "user", "content": "x"}, {"role": "assistant", "content": "y"}])
+chk("SFT chat template renders", _sft)
+
+def _corpus():
+    assert os.path.exists("data/synthetic/sprocket_sft.jsonl"), "SFT corpus missing from repo"
+    n = sum(1 for _ in open("data/synthetic/sprocket_sft.jsonl", encoding="utf-8"))
+    assert n > 10000, f"only {n} SFT rows"
+    print(f"         {n:,} SFT conversations present")
+chk("SFT corpus shipped in the repo", _corpus)
+
+# Writability of the eventual destination — a bad token should not surface on day 5.
+if os.environ.get("HF_TOKEN") and os.environ.get("HF_REPO"):
+    def _hf():
+        from huggingface_hub import HfApi
+        api = HfApi(token=os.environ["HF_TOKEN"])
+        api.create_repo(os.environ["HF_REPO"], repo_type="model",
+                        private=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
+            f.write("preflight"); p = f.name
+        api.upload_file(path_or_fileobj=p, path_in_repo=".preflight",
+                        repo_id=os.environ["HF_REPO"], repo_type="model")
+        os.unlink(p)
+    chk("HuggingFace push (write access proven)", _hf)
+else:
+    print("    skip HuggingFace push check (HF_TOKEN/HF_REPO unset)")
+
+if fail:
+    print(f"\nPREFLIGHT FAILED: {fail}")
+    sys.exit(1)
+print("\n  preflight OK — safe to spend GPU time")
+PY
+
 # ---------------------------------------------------------------- 2. corpus
 log "building corpus: target $TOKENS tokens from $SUBSET (resumable)"
 python scripts/build_corpus.py \

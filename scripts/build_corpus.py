@@ -54,6 +54,9 @@ def main():
     ap.add_argument("--scratch", default="data/raw/_shards")
     ap.add_argument("--keep-parquet", action="store_true")
     ap.add_argument("--batch-docs", type=int, default=2000)
+    ap.add_argument("--flush-tokens", type=int, default=16_000_000,
+                    help="buffer this many tokens (~32MB) before writing; large "
+                         "values matter enormously on network storage")
     ap.add_argument("--max-shards", type=int, default=0, help="0 = unlimited")
     a = ap.parse_args()
 
@@ -126,6 +129,19 @@ def main():
 
             n_tok, n_doc = 0, 0
             pf = pq.ParquetFile(path)
+            # Buffer before writing. Measured on RunPod: writing once per document
+            # (194k tiny writes) ran at 453K tok/s against a NETWORK volume, vs
+            # 2.86M tok/s on a local SSD — a 6x penalty that a local dry run cannot
+            # reveal. At 50B tokens that is ~30h vs ~5h, i.e. ~$75 of wasted H100.
+            buf = []
+            buf_tok = 0
+
+            def flush():
+                nonlocal buf, buf_tok
+                if buf:
+                    np.concatenate(buf).tofile(out_f)
+                    buf, buf_tok = [], 0
+
             for batch in pf.iter_batches(batch_size=a.batch_docs, columns=["text"]):
                 texts = [t for t in batch.column("text").to_pylist() if t]
                 if not texts:
@@ -134,11 +150,15 @@ def main():
                 for enc in tok.encode_batch(texts, add_special_tokens=False):
                     ids = enc.ids
                     ids.append(EOT)          # document separator
-                    np.asarray(ids, dtype=np.uint16).tofile(out_f)
+                    buf.append(np.asarray(ids, dtype=np.uint16))
+                    buf_tok += len(ids)
                     n_tok += len(ids)
                 n_doc += len(texts)
+                if buf_tok >= a.flush_tokens:
+                    flush()
                 if man["tokens"] + n_tok >= target:
                     break
+            flush()
 
             out_f.flush()
             os.fsync(out_f.fileno())

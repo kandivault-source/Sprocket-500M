@@ -3,7 +3,12 @@
 # a CUDA-matched build, and reinstalling it would pull a wheel that mismatches
 # the driver. Install torch only on a bare box.
 tokenizers>=0.20
-transformers>=4.45
+# UPPER BOUND IS LOAD-BEARING. transformers 5.x imports torch.distributed.tensor
+# .DTensor, which does not exist in torch 2.4 — the version shipped by the RunPod
+# pytorch:2.4.x images. Unpinned, pip pulls 5.x and export_hf.py dies with
+# ImportError AFTER pretrain and SFT have already completed. Cost us a smoke run.
+# Raise this bound only alongside an image with torch >= 2.6.
+transformers>=4.45,<5.0
 huggingface_hub>=0.25
 pyarrow>=15
 numpy>=1.26
