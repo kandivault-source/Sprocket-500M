@@ -1,0 +1,703 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Homebrew LLM — Build Dashboard</title>
+<style>
+  :root {
+    color-scheme: light;
+    --plane:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
+    --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,0.10);
+    --s1:#2a78d6; --s2:#008300; --s3:#e87ba4; --s4:#eda100; --s6:#eb6834;
+    --good:#0ca30c; --warn:#fab219; --crit:#d03b3b;
+    --emb:#4a3aa7; --attn:#2a78d6; --mlp:#1baf7a; --head:#eb6834;
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --plane:#0d0d0d; --surface:#1a1a19; --ink:#fff; --ink2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
+    --s1:#3987e5; --s2:#008300; --s3:#d55181; --s4:#c98500; --s6:#d95926;
+    --emb:#9085e9; --attn:#3987e5; --mlp:#199e70; --head:#d95926;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --plane:#0d0d0d; --surface:#1a1a19; --ink:#fff; --ink2:#c3c2b7; --muted:#898781;
+      --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
+      --s1:#3987e5; --s3:#d55181; --s4:#c98500; --s6:#d95926;
+      --emb:#9085e9; --attn:#3987e5; --mlp:#199e70; --head:#d95926;
+    }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--plane); color:var(--ink);
+    font-family:system-ui,-apple-system,"Segoe UI",sans-serif; line-height:1.5; }
+  .wrap { max-width:1180px; margin:0 auto; padding:24px 20px 80px; }
+  header { display:flex; flex-wrap:wrap; align-items:center; gap:16px; margin-bottom:8px; }
+  h1 { font-size:22px; margin:0; letter-spacing:-0.01em; }
+  h1 .dot { color:var(--good); }
+  .sub { color:var(--ink2); font-size:14px; margin:2px 0 22px; }
+  .controls { margin-left:auto; display:flex; gap:8px; align-items:center; }
+  .seg { display:inline-flex; border:1px solid var(--border); border-radius:999px; overflow:hidden; }
+  .seg button { border:0; background:transparent; color:var(--ink2); padding:7px 14px;
+    font-size:13px; font-weight:600; cursor:pointer; }
+  .seg button.on { background:var(--ink); color:var(--surface); }
+  .icon-btn { border:1px solid var(--border); background:var(--surface); color:var(--ink);
+    border-radius:999px; width:36px; height:34px; cursor:pointer; font-size:15px; }
+  .panel { background:var(--surface); border:1px solid var(--border); border-radius:14px;
+    padding:20px 22px; margin:16px 0; }
+  .panel h2 { font-size:15px; margin:0 0 3px; letter-spacing:0.02em; text-transform:uppercase; }
+  .panel .lead { color:var(--ink2); font-size:14px; margin:0 0 18px; max-width:70ch; }
+  .simple, .tech { }
+  body.mode-tech .simple { display:none; }
+  body.mode-simple .tech { display:none; }
+  .row { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:16px; }
+
+  /* size selector */
+  .sizes { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:18px; }
+  .sizes button { border:1px solid var(--border); background:transparent; color:var(--ink2);
+    border-radius:10px; padding:8px 13px; cursor:pointer; font-size:13px; text-align:left; }
+  .sizes button.on { border-color:var(--s1); color:var(--ink); background:color-mix(in srgb,var(--s1) 8%,transparent); }
+  .sizes button b { display:block; color:var(--ink); font-size:13px; }
+  .sizes button span { font-size:11px; color:var(--muted); }
+
+  /* network diagram */
+  .net { display:flex; align-items:stretch; gap:0; overflow-x:auto; padding:6px 2px 14px; }
+  .stage { display:flex; flex-direction:column; align-items:center; gap:6px; min-width:96px; }
+  .box { width:100%; border-radius:10px; padding:11px 8px; text-align:center; cursor:pointer;
+    border:1.5px solid; background:var(--surface); transition:transform .08s; }
+  .box:hover { transform:translateY(-2px); }
+  .box.sel { box-shadow:0 0 0 2px var(--surface),0 0 0 4px currentColor; }
+  .box .t { font-size:12px; font-weight:700; }
+  .box .n { font-size:11px; color:var(--muted); margin-top:2px; font-variant-numeric:tabular-nums; }
+  .box.emb { color:var(--emb); } .box.attn { color:var(--attn); }
+  .box.mlp { color:var(--mlp); } .box.head { color:var(--head); }
+  .box .t, .box .n { color:var(--ink); }
+  .stack { position:relative; width:100%; }
+  .stack .badge { position:absolute; top:-9px; right:-6px; background:var(--ink); color:var(--surface);
+    font-size:10px; font-weight:700; border-radius:999px; padding:1px 7px; z-index:2; }
+  .stack .layer2,.stack .layer3 { position:absolute; inset:0; border-radius:10px; border:1.5px solid var(--attn);
+    background:var(--surface); }
+  .stack .layer2 { transform:translate(4px,4px); opacity:.5; }
+  .stack .layer3 { transform:translate(8px,8px); opacity:.28; }
+  .stack .block { position:relative; z-index:1; border:1.5px solid var(--attn); border-radius:10px;
+    padding:9px 7px; background:var(--surface); }
+  .stack .sub { display:flex; flex-direction:column; gap:5px; }
+  .arrow { align-self:center; color:var(--muted); font-size:18px; padding:0 3px; }
+  .readout { margin-top:8px; border-top:1px solid var(--border); padding-top:14px;
+    display:grid; grid-template-columns:1fr 1fr; gap:8px 22px; }
+  .readout .k { font-size:12px; color:var(--muted); }
+  .readout .v { font-size:13px; color:var(--ink); font-variant-numeric:tabular-nums; }
+  #compTitle { font-size:14px; font-weight:700; margin-bottom:2px; }
+  #compDesc { font-size:13px; color:var(--ink2); margin-bottom:12px; max-width:70ch; }
+
+  /* bar charts */
+  .chart { margin-top:6px; }
+  .bar-row { display:flex; align-items:center; gap:10px; margin:7px 0; font-size:12px; }
+  .bar-row .lab { width:74px; color:var(--ink2); flex:none; font-variant-numeric:tabular-nums; }
+  .track { position:relative; flex:1; height:22px; background:color-mix(in srgb,var(--grid) 55%,transparent);
+    border-radius:5px; }
+  .fill { position:absolute; left:0; top:0; bottom:0; border-radius:5px 4px 4px 5px; min-width:3px; }
+  .bar-row .val { width:66px; text-align:right; color:var(--ink); flex:none; font-variant-numeric:tabular-nums; }
+  .refline { position:absolute; top:-4px; bottom:-4px; width:2px; background:var(--crit); }
+  .refline span { position:absolute; top:-16px; left:4px; font-size:10px; color:var(--crit); white-space:nowrap; }
+  .legend { display:flex; flex-wrap:wrap; gap:14px; margin-top:14px; font-size:12px; color:var(--ink2); }
+  .legend i { display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:5px; vertical-align:-1px; }
+  .note { font-size:12.5px; color:var(--ink2); margin-top:14px; padding:10px 12px; border-left:3px solid var(--s1);
+    background:color-mix(in srgb,var(--s1) 6%,transparent); border-radius:0 8px 8px 0; }
+  .tag { display:inline-block; font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px;
+    background:color-mix(in srgb,var(--good) 15%,transparent); color:var(--good); vertical-align:1px; }
+  .foot { color:var(--muted); font-size:12px; margin-top:26px; text-align:center; }
+  .tip { position:fixed; pointer-events:none; background:var(--ink); color:var(--surface); font-size:12px;
+    padding:6px 9px; border-radius:7px; opacity:0; transition:opacity .1s; z-index:50; font-variant-numeric:tabular-nums; }
+  /* tokenizer panel */
+  .tok-io input { width:100%; font-size:15px; padding:11px 14px; border-radius:10px;
+    border:1px solid var(--border); background:var(--plane); color:var(--ink); font-family:inherit; }
+  .tok-io input:focus { outline:none; border-color:var(--s1); }
+  .chips { display:flex; flex-wrap:wrap; gap:4px; margin-top:12px; }
+  .chip { font-family:ui-monospace,"Cascadia Code",Consolas,monospace; font-size:13px;
+    padding:4px 7px; border-radius:6px; white-space:pre; border:1px solid var(--border); }
+  .chip small { color:var(--muted); font-size:9px; display:block; text-align:center; margin-top:1px;
+    font-family:system-ui; }
+  .chip .sp { color:var(--muted); }
+  .chip.special { background:color-mix(in srgb,var(--s4) 22%,transparent); border-color:var(--s4); font-weight:700; }
+  .tok-meta { margin-top:12px; font-size:13px; color:var(--ink2); font-variant-numeric:tabular-nums; }
+  .tok-meta b { color:var(--ink); }
+  .mini-h { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.03em;
+    color:var(--ink2); margin-bottom:8px; }
+  .hbar { display:flex; align-items:center; gap:8px; margin:3px 0; font-size:11px; }
+  .hbar .hl { width:16px; color:var(--muted); text-align:right; flex:none; font-variant-numeric:tabular-nums; }
+  .hbar .ht { flex:1; height:14px; background:color-mix(in srgb,var(--grid) 55%,transparent); border-radius:4px; }
+  .hbar .hf { height:100%; background:var(--s1); border-radius:4px; }
+  .showmore { margin-top:12px; border:1px solid var(--border); background:var(--surface); color:var(--s1);
+    border-radius:8px; padding:8px 15px; font-size:13px; font-weight:600; cursor:pointer; font-variant-numeric:tabular-nums; }
+  .showmore:hover { background:color-mix(in srgb,var(--s1) 8%,transparent); }
+  /* training panel */
+  .tstats { display:flex; flex-wrap:wrap; gap:26px; margin-bottom:16px; }
+  .tstats .st .v { font-size:23px; font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:-0.01em; }
+  .tstats .st .k { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.03em; }
+  .sample-box { font-family:ui-monospace,"Cascadia Code",Consolas,monospace; font-size:13px; line-height:1.6;
+    color:var(--ink2); background:var(--plane); border:1px solid var(--border); border-radius:10px;
+    padding:14px 16px; white-space:pre-wrap; min-height:58px; }
+  .pulse { display:inline-block; width:9px; height:9px; border-radius:50%; background:var(--good);
+    margin-right:6px; animation:pulse 1.2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.25} }
+  /* loss ladder */
+  .ladder { position:relative; height:56px; margin-top:8px; }
+  .ladder .lt { position:absolute; left:2%; right:2%; top:24px; height:5px; border-radius:3px;
+    background:linear-gradient(90deg,var(--crit),var(--s4) 55%,var(--s2)); }
+  .ladder .tick { position:absolute; top:16px; width:1px; height:22px; background:var(--axis); }
+  .ladder .tlab { position:absolute; top:0; font-size:9.5px; line-height:1.15; color:var(--muted);
+    transform:translateX(-50%); white-space:nowrap; text-align:center; }
+  .ladder .mk { position:absolute; top:19px; width:13px; height:13px; border-radius:50%; background:var(--s1);
+    border:2px solid var(--surface); box-shadow:0 0 0 2px var(--s1); transform:translateX(-50%); z-index:2; }
+  .ladder .mkl { position:absolute; top:37px; font-size:10.5px; font-weight:700; color:var(--s1);
+    transform:translateX(-50%); white-space:nowrap; }
+</style>
+</head>
+<body class="mode-simple">
+<div class="wrap">
+  <header>
+    <div>
+      <h1><span class="dot">●</span> Homebrew LLM <span style="color:var(--muted);font-weight:400">/ build dashboard</span></h1>
+    </div>
+    <div class="controls">
+      <div class="seg" id="modeSeg">
+        <button data-mode="simple" class="on">Simple</button>
+        <button data-mode="tech">Technical</button>
+      </div>
+      <button class="icon-btn" id="themeBtn" title="Toggle light/dark">◐</button>
+    </div>
+  </header>
+  <p class="sub">A language model built from scratch on an RTX 4060 — every number here is measured or computed from the real code, nothing mocked. <span class="tag">Phase 0–1 · live</span></p>
+
+  <!-- PANEL 0: THE TOKENIZER -->
+  <section class="panel" id="tokPanel">
+    <h2>Step 1 · The Tokenizer</h2>
+    <p class="lead simple">A model can't read letters — only numbers. The tokenizer is the translator: it chops text into common chunks ("tokens") and gives each one a number. We built ours from scratch by showing it 200 million words and letting it discover the ~32,000 most useful chunks. Type anything below and watch it split in real time.</p>
+    <p class="lead tech">Byte-level BPE, 32,000 vocab, trained from scratch on 200M tokens of FineWeb-Edu. 8 special tokens reserved at ids 0–7 for the chat/tool protocol. Compression ≈ 4.52 chars/token. Live encode below hits the real tokenizer via /api/tokenize.</p>
+
+    <div class="tok-io"><input id="tokInput" type="text" value="The witch will help you debug your code. 🧙"></div>
+    <div id="tokChips" class="chips"></div>
+    <div id="tokMeta" class="tok-meta"></div>
+
+    <div class="row" style="margin-top:20px">
+      <div>
+        <div class="mini-h">Token length distribution</div>
+        <div id="tokHist"></div>
+        <div class="mini-h" style="margin-top:16px">Longest chunks it learned</div>
+        <div id="tokLongest" class="chips"></div>
+      </div>
+      <div>
+        <div class="mini-h simple">Reserved slots for chat &amp; tools</div>
+        <div class="mini-h tech">Special tokens · fixed ids 0–7</div>
+        <div id="tokSpecials" class="chips"></div>
+        <div class="note simple" style="margin-top:14px">These 8 slots were locked in before training so the model can learn to chat and call tools later — you can't add them afterward without rebuilding the model's memory.</div>
+        <div class="note tech" style="margin-top:14px">Reserved pre-training so the chat template and tool protocol need no embedding resize downstream. 8 more reserved slots (8–15) left for future use.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PANEL 0b: THE VOCABULARY -->
+  <section class="panel" id="vocabPanel">
+    <h2>The Vocabulary <span style="color:var(--muted);font-weight:400;font-size:13px">· 32,000 tokens</span></h2>
+    <p class="lead simple">Every chunk the model knows — discovered from your data, not handed to it. Search for a word to see which pieces exist and their id numbers.</p>
+    <p class="lead tech">The full 32k byte-level BPE vocabulary. Filters client-side; · marks a leading space; ids 0–15 are the reserved special tokens.</p>
+    <div class="tok-io"><input id="vocabSearch" type="text" placeholder="search the vocabulary…  e.g.  goblin   the   def   ing"></div>
+    <div id="vocabMeta" class="tok-meta"></div>
+    <div id="vocabList" class="chips" style="max-height:360px;overflow-y:auto;align-content:flex-start"></div>
+    <button id="vocabMore" class="showmore" style="display:none"></button>
+  </section>
+
+  <!-- PANEL 1: THE NETWORK -->
+  <section class="panel">
+    <h2>The Network</h2>
+    <p class="lead simple">This is the actual shape of the brain we're building. Words go in the left side, flow through a stack of identical "thinking" layers, and a next word comes out the right. Pick a size, then click any block to see what it does.</p>
+    <p class="lead tech">Decoder-only transformer (Llama-family): tied token embedding → N× pre-norm blocks (RMSNorm → RoPE grouped-query attention → RMSNorm → SwiGLU) → final RMSNorm → tied LM head. Click a component for exact parameter counts computed from the config.</p>
+
+    <div class="sizes" id="sizes"></div>
+    <div class="net" id="net"></div>
+
+    <div id="compTitle"></div>
+    <div id="compDesc"></div>
+    <div class="readout" id="readout"></div>
+  </section>
+
+  <!-- PANEL 1b: 3D EMBEDDINGS -->
+  <section class="panel" id="embedPanel">
+    <h2>The Meaning Map <span class="tag" style="background:color-mix(in srgb,var(--emb) 16%,transparent);color:var(--emb)">3D · real embeddings</span></h2>
+    <p class="lead simple">Every word-piece lives at a point in space, and the model learned to place related ones near each other — that's what "understanding" looks like as numbers. This is that space, squashed from 640 dimensions down to 3 so we can see it. Drag to spin it; hover a dot to read its word.</p>
+    <p class="lead tech">Token embeddings (32000×640) from the trained model, PCA-projected to 3D. Colored by token type. Note: the top 3 axes capture only ~9% of the variance (this model is under-trained, and 640-dim structure can't fully fit in 3-D) — so this shows the dominant axes, not the whole story.</p>
+    <canvas id="embCanvas" style="width:100%;height:420px;display:block;cursor:grab;touch-action:none;border-radius:10px"></canvas>
+    <div id="embHover" class="tok-meta" style="min-height:18px">Drag to rotate · hover a point for its word</div>
+    <div class="legend">
+      <span><i style="background:var(--s1)"></i>word</span>
+      <span><i style="background:var(--s4)"></i>Capitalized</span>
+      <span><i style="background:var(--s2)"></i>number</span>
+      <span><i style="background:var(--s6)"></i>symbol</span>
+    </div>
+  </section>
+
+  <!-- PANEL 1c: REAL WEIGHTS -->
+  <section class="panel" id="weightsPanel">
+    <h2>Under The Hood <span style="color:var(--muted);font-weight:400;font-size:13px">· real weights</span></h2>
+    <p class="lead simple">These are the actual numbers inside your model — the "weights" it learned. There are 76 million of them, so we can't show every one, but pick any part of the network and see the real distribution and a sample of raw values.</p>
+    <p class="lead tech">Live from the trained checkpoint. Select a parameter tensor to see its shape, statistics, weight-value histogram, and the first raw values.</p>
+    <select id="wSelect" class="tok-io" style="width:100%;padding:9px 12px;border-radius:9px;border:1px solid var(--border);background:var(--plane);color:var(--ink);font-family:inherit;font-size:13px"></select>
+    <div id="wStats" class="tstats" style="margin-top:14px"></div>
+    <div class="mini-h" style="margin-top:6px">Distribution of the real weight values</div>
+    <div id="wHist"></div>
+    <div class="mini-h" style="margin-top:14px">First 10 raw values</div>
+    <div id="wSample" class="sample-box" style="font-size:12px"></div>
+  </section>
+
+  <!-- PANEL 2: TRAINING (LIVE) -->
+  <section class="panel" id="trainPanel">
+    <h2>Step 3 · Training <span class="tag" style="background:color-mix(in srgb,var(--s1) 15%,transparent);color:var(--s1)">live</span></h2>
+    <p class="lead simple">This is the model actually learning. Each point on the curve is it getting slightly better at guessing the next word — lower is better. When the line flattens, it has learned what this data can teach it. The box at the bottom is what it can write <em>right now</em>: watch gibberish slowly turn into real English.</p>
+    <p class="lead tech">75M params, 1024 ctx, bf16, AdamW, cosine LR + warmup. Loss = cross-entropy in nats/token; the random-guess baseline is ln(32000) ≈ 10.4. Train and val streamed live from /api/metrics.</p>
+    <div id="trainStats" class="tstats"></div>
+    <div id="lossChart"></div>
+    <div class="mini-h" style="margin-top:18px">Where this loss sits — the perplexity ladder</div>
+    <div id="lossLadder"></div>
+    <div class="mini-h" style="margin-top:18px">What it can write right now</div>
+    <div id="trainSample" class="sample-box">Waiting for a training run… start it with <code>py src/train/train.py</code></div>
+  </section>
+
+  <!-- PANEL 2b: PLAYGROUND (live model) -->
+  <section class="panel" id="playPanel">
+    <h2>Play With It <span class="tag" style="background:color-mix(in srgb,var(--s2) 15%,transparent);color:var(--s2)">live model</span></h2>
+    <p class="lead simple">This is your actual trained model, running right now. Give it a phrase to start and watch it continue. It's a 76M "potato" trained for ~30 minutes — expect confident nonsense that reads like English, and notice it stays far more on-topic when you give it a subject to run with.</p>
+    <p class="lead tech">proto-75m checkpoint served live via /api/generate (temp 0.8, top-k 50). Prompted generation is much more coherent than unconditional sampling — the context effect, live.</p>
+    <div class="tok-io" style="display:flex;gap:8px;align-items:stretch">
+      <input id="playPrompt" type="text" value="The history of science" style="flex:1">
+      <button id="playBtn" class="showmore" style="margin-top:0;white-space:nowrap">Generate ▸</button>
+    </div>
+    <div id="playOut" class="sample-box" style="margin-top:12px">Type a phrase and hit Generate — your model will continue it.</div>
+  </section>
+
+  <!-- PANEL 2: DATA CHARTS -->
+  <div class="row">
+    <section class="panel">
+      <h2>What Fits On The Card</h2>
+      <p class="lead simple">Training needs far more memory than the finished model — it has to remember how to improve every single number. Here's how much each size needs versus the ~7&nbsp;GB the 4060 actually has free.</p>
+      <p class="lead tech">Training footprint ≈ 16 bytes/param (fp32 weights + grads + AdamW moments). The 4060 has ~7&nbsp;GB usable after the desktop. Above the line = won't train locally.</p>
+      <div class="chart" id="memChart"></div>
+      <div class="note simple">Anything past the red line has to train on a rented cloud GPU — its memory won't fit here.</div>
+      <div class="note tech">Local training ceiling ≈ 340M params. The 1B needs 17.7&nbsp;GB of optimizer state → cloud-only. CPU-RAM offload can lift the memory wall, but not the 4060's compute wall.</div>
+    </section>
+
+    <section class="panel">
+      <h2>Speed &amp; The Memory Cliff</h2>
+      <p class="lead simple">More examples at once = faster training… until it overflows the card and falls off a cliff, running ~9× slower. We stay just left of the cliff.</p>
+      <p class="lead tech">125M model, 1024-token sequences, bf16. Micro-batch 4 is the sweet spot (5.5&nbsp;GB, 18.1k tok/s). Batch 6+ spills to shared memory and collapses.</p>
+      <div class="chart" id="tpChart"></div>
+      <div class="legend">
+        <span><i style="background:var(--s1)"></i>fits in VRAM</span>
+        <span><i style="background:var(--crit)"></i>spilled — invalid speed</span>
+      </div>
+    </section>
+  </div>
+
+  <!-- PANEL 3: CONTEXT -->
+  <section class="panel">
+    <h2>How Far It Can See</h2>
+    <p class="lead simple">The "context" is how much text the model can hold in mind at once. Bigger sounds better, but the memory it needs grows fast — here's what a 1B model would need to remember a given amount, and where it stops fitting.</p>
+    <p class="lead tech">KV-cache at inference for the 1B config (22 layers, 8 KV-heads, head_dim 128) = 88&nbsp;KB/token. Full attention — no windowing. Reaching long context = pretrain short then extend via RoPE scaling.</p>
+    <div class="chart" id="ctxChart"></div>
+    <div class="legend">
+      <span><i style="background:var(--s1)"></i>KV-cache memory needed</span>
+      <span><i style="background:var(--warn)"></i>4060 limit (~7&nbsp;GB)</span>
+      <span><i style="background:var(--crit)"></i>cloud A100 limit (80&nbsp;GB)</span>
+    </div>
+    <div class="note simple">Your target of true 64k context fits comfortably. A full million tokens would need 90&nbsp;GB just to remember — more than even a big cloud GPU — so we aim high but realistic.</div>
+    <div class="note tech">64k full-attention = 5.6&nbsp;GB cache (cloud-easy). 128k = 11.5&nbsp;GB (exceeds the 4060 for inference). 1M = 90&nbsp;GB (exceeds an 80&nbsp;GB A100). Attention compute is O(T²): 1M ≈ 15,000× an 8k pass.</div>
+  </section>
+
+  <p class="foot">Every value computed from <code>src/model/model.py</code> and measured on the RTX 4060 · this is v0 — live training curves, the tokenizer, and embedding projections plug in next.</p>
+</div>
+<div class="tip" id="tip"></div>
+
+<script>
+const VOCAB = 32000;
+const PRESETS = [
+  {id:'proto-50m',  name:'Prototype', dim:512,  layers:8,  heads:8,  kv:8, ctx:1024, params:43.7,  trainGB:0.7},
+  {id:'small-125m', name:'Small',     dim:768,  layers:12, heads:12, kv:12,ctx:1024, params:109.5, trainGB:1.8},
+  {id:'mid-350m',   name:'Mid',       dim:1024, layers:24, heads:16, kv:16,ctx:2048, params:341.1, trainGB:5.5},
+  {id:'large-1b',   name:'Large',     dim:2048, layers:22, heads:16, kv:8, ctx:2048, params:1103.7,trainGB:17.7},
+];
+const TP = [ {b:2,tps:16302,spill:false},{b:4,tps:18120,spill:false},{b:6,tps:4307,spill:true},{b:8,tps:1999,spill:true} ];
+const CTX = [ {t:8192,gb:0.7},{t:32768,gb:3.0},{t:128000,gb:11.5},{t:256000,gb:23.1},{t:700000,gb:63.1},{t:1000000,gb:90.1} ];
+
+const fmt = n => n>=1e9? (n/1e9).toFixed(2)+'B' : n>=1e6? (n/1e6).toFixed(1)+'M' : n>=1e3? (n/1e3).toFixed(1)+'k' : n;
+const ctxLab = t => t>=1e6? (t/1e6)+'M' : Math.floor(t/1000)+'k';
+
+function comps(p){
+  const hd = p.dim/p.heads;
+  const hidden = Math.ceil((8/3*p.dim)/256)*256;
+  const emb = VOCAB*p.dim;
+  const attn = (p.dim*p.dim) + 2*(p.dim*p.kv*hd) + (p.dim*p.dim); // wq+wk+wv+wo
+  const mlp = 3*p.dim*hidden;
+  return {hd,hidden,emb,attn,mlp,attnAll:attn*p.layers,mlpAll:mlp*p.layers};
+}
+
+let cur = PRESETS[3], sel = 'block';
+
+const DESC = {
+  emb: {
+    t:'Token Embedding',
+    simple:'A giant lookup table. Every possible word-piece gets its own list of numbers (a "vector"). This is how text becomes math the network can work with. The same table is reused at the very end to turn numbers back into words.',
+    tech:c=>`Lookup table of ${VOCAB.toLocaleString()} rows × ${cur.dim} dims. Weight-tied with the output head (counted once). ${cur.dim} numbers describe each token.`,
+  },
+  attn: {
+    t:'Attention (per block)',
+    simple:'This is where each word looks at the other words to figure out what matters. "It" looks back to find what "it" refers to. Every layer does this fresh, building richer understanding.',
+    tech:c=>`Grouped-query attention: ${cur.heads} query heads, ${cur.kv} KV heads, head_dim ${c.hd}. RoPE positions, causal. wq+wk+wv+wo ≈ ${fmt(c.attn)} params/block.`,
+  },
+  mlp: {
+    t:'Feed-Forward / SwiGLU (per block)',
+    simple:'After looking around, each word "thinks" on its own — a mini processing step that transforms what it learned. This is where most of the model\'s raw knowledge is stored.',
+    tech:c=>`SwiGLU MLP: dim ${cur.dim} → hidden ${c.hidden} → dim ${cur.dim}, gated (w1·SiLU ⊙ w3)·w2 ≈ ${fmt(c.mlp)} params/block.`,
+  },
+  block:{
+    t:cur=>`${cur.layers}× Transformer Block`,
+    simple:'The stack of identical thinking layers. Each one contains an Attention step (look around) and a Feed-Forward step (think), and text passes through all of them in order. More layers = deeper reasoning.',
+    tech:c=>`${cur.layers} identical pre-norm blocks. Each: RMSNorm → attention → residual, RMSNorm → SwiGLU → residual. Total block params ≈ ${fmt(c.attnAll+c.mlpAll)}.`,
+  },
+  head:{
+    t:'Output Head',
+    simple:'The final step: it scores every possible next word-piece and the highest score is what the model says next. It reuses the same table from the start, so it costs no extra memory.',
+    tech:c=>`Projects final ${cur.dim}-dim state → ${VOCAB.toLocaleString()} logits. Weight-tied to the embedding (0 extra params). Softmax → next-token probability.`,
+  },
+};
+
+function renderSizes(){
+  const el = document.getElementById('sizes'); el.innerHTML='';
+  PRESETS.forEach(p=>{
+    const b=document.createElement('button'); b.className=p.id===cur.id?'on':'';
+    b.innerHTML=`<b>${p.name} · ${fmt(p.params*1e6)}</b><span>${p.dim}d · ${p.layers}L · ${p.heads}h</span>`;
+    b.onclick=()=>{cur=p; renderAll();};
+    el.appendChild(b);
+  });
+}
+function box(cls,tt,nn,key){ return `<div class="box ${cls} ${sel===key?'sel':''}" data-k="${key}"><div class="t">${tt}</div><div class="n">${nn}</div></div>`; }
+function renderNet(){
+  const c=comps(cur);
+  const net=document.getElementById('net');
+  net.innerHTML = `
+    <div class="stage"><div class="box" style="border-color:var(--muted);cursor:default"><div class="t">Text in</div><div class="n">"the cat…"</div></div></div>
+    <div class="arrow">→</div>
+    <div class="stage" style="min-width:110px">${box('emb','Embedding',fmt(c.emb),'emb')}</div>
+    <div class="arrow">→</div>
+    <div class="stage" style="min-width:150px">
+      <div class="stack">
+        <span class="badge">× ${cur.layers}</span>
+        <div class="layer3"></div><div class="layer2"></div>
+        <div class="block" data-k="block" style="cursor:pointer">
+          <div class="sub">
+            ${box('attn','Attention',fmt(c.attn),'attn')}
+            ${box('mlp','Feed-Forward',fmt(c.mlp),'mlp')}
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="stage" style="min-width:110px">${box('head','Output Head','tied',' head')}</div>
+    <div class="arrow">→</div>
+    <div class="stage"><div class="box" style="border-color:var(--muted);cursor:default"><div class="t">Next word</div><div class="n">"sat"</div></div></div>`;
+  net.querySelectorAll('[data-k]').forEach(n=>n.onclick=()=>{sel=n.dataset.k.trim(); renderNet(); renderReadout();});
+}
+function renderReadout(){
+  const c=comps(cur);
+  const d=DESC[sel]||DESC.block;
+  const title = typeof d.t==='function'? d.t(cur): d.t;
+  document.getElementById('compTitle').textContent = title;
+  const mode = document.body.classList.contains('mode-tech')?'tech':'simple';
+  document.getElementById('compDesc').textContent = mode==='tech'? d.tech(c) : d.simple;
+  const rows = [
+    ['Total parameters', fmt(cur.params*1e6)],
+    ['Model width (dims)', cur.dim],
+    ['Layers', cur.layers],
+    ['Attention heads', `${cur.heads} query / ${cur.kv} KV`],
+    ['Params in all attention', fmt(c.attnAll)],
+    ['Params in all feed-forward', fmt(c.mlpAll)],
+    ['Vocabulary', VOCAB.toLocaleString()],
+    ['Trains locally?', cur.trainGB<=5.5? 'yes' : 'cloud only'],
+  ];
+  document.getElementById('readout').innerHTML = rows.map(r=>`<div class="k">${r[0]}</div><div class="v">${r[1]}</div>`).slice(0,8)
+    .map((h,i)=> i%2? h : h).join('');
+  // grid places k then v; rebuild properly:
+  document.getElementById('readout').innerHTML = rows.map(r=>`<div class="k">${r[0]}</div><div class="v">${r[1]}</div>`).join('');
+}
+
+function bar(track, pct, color, valText, tipText){
+  return `<div class="track">${track}<div class="fill" style="width:${Math.max(pct,1.5)}%;background:${color}" data-tip="${tipText}"></div></div><div class="val">${valText}</div>`;
+}
+function renderMem(){
+  const max=20; const ceil=7;
+  const el=document.getElementById('memChart');
+  el.innerHTML = PRESETS.map(p=>{
+    const pct=p.trainGB/max*100, over=p.trainGB>ceil;
+    const color= over? 'var(--crit)':'var(--s1)';
+    return `<div class="bar-row"><div class="lab">${p.name}</div>`+
+      `<div class="track"><div class="fill" style="width:${pct}%;background:${color}" data-tip="${p.name}: ${p.trainGB} GB to train"></div>`+
+      `<div class="refline" style="left:${ceil/max*100}%"><span>7GB</span></div></div>`+
+      `<div class="val">${p.trainGB} GB</div></div>`;
+  }).join('');
+}
+function renderTP(){
+  const max=20000; const el=document.getElementById('tpChart');
+  el.innerHTML = TP.map(d=>{
+    const pct=d.tps/max*100; const color= d.spill?'var(--crit)':'var(--s1)';
+    return `<div class="bar-row"><div class="lab">batch ${d.b}</div>`+
+      `<div class="track"><div class="fill" style="width:${pct}%;background:${color}" data-tip="batch ${d.b}: ${d.tps.toLocaleString()} tok/s${d.spill?' (spilled)':''}"></div></div>`+
+      `<div class="val">${(d.tps/1000).toFixed(1)}k</div></div>`;
+  }).join('');
+}
+function renderCtx(){
+  const max=90; const el=document.getElementById('ctxChart');
+  el.innerHTML = CTX.map(d=>{
+    const pct=d.gb/max*100;
+    const color = d.gb>80?'var(--crit)': d.gb>7?'var(--s6)':'var(--s1)';
+    return `<div class="bar-row"><div class="lab">${ctxLab(d.t)}</div>`+
+      `<div class="track"><div class="fill" style="width:${pct}%;background:${color}" data-tip="${ctxLab(d.t)} tokens: ${d.gb} GB KV-cache"></div>`+
+      `<div class="refline" style="left:${7/max*100}%;background:var(--warn)"><span style="color:var(--warn)">4060</span></div>`+
+      `<div class="refline" style="left:${80/max*100}%"><span>A100 80GB</span></div></div>`+
+      `<div class="val">${d.gb} GB</div></div>`;
+  }).join('');
+}
+
+function renderAll(){ renderSizes(); renderNet(); renderReadout(); renderMem(); renderTP(); renderCtx(); }
+
+// interactions
+const tip=document.getElementById('tip');
+document.addEventListener('mousemove',e=>{
+  const t=e.target.closest('[data-tip]');
+  if(t){ tip.textContent=t.dataset.tip; tip.style.opacity=1; tip.style.left=(e.clientX+12)+'px'; tip.style.top=(e.clientY+12)+'px'; }
+  else tip.style.opacity=0;
+});
+document.getElementById('modeSeg').onclick=e=>{
+  const b=e.target.closest('button'); if(!b)return;
+  document.querySelectorAll('#modeSeg button').forEach(x=>x.classList.toggle('on',x===b));
+  document.body.className = 'mode-'+b.dataset.mode;
+  renderReadout();
+};
+document.getElementById('themeBtn').onclick=()=>{
+  const r=document.documentElement;
+  const dark = r.getAttribute('data-theme')==='dark' || (!r.getAttribute('data-theme') && matchMedia('(prefers-color-scheme: dark)').matches);
+  r.setAttribute('data-theme', dark?'light':'dark');
+};
+
+// ---- Tokenizer panel ----
+const CHIP_COLORS = ['var(--s1)','var(--s2)','var(--s3)','var(--s4)','var(--s6)'];
+const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function chipHTML(piece,id,i,special){
+  let disp = esc(piece).replace(/ /g,'<span class="sp">·</span>').replace(/\n/g,'⏎');
+  if(disp==='') disp='<span class="sp">∅</span>';
+  const c = CHIP_COLORS[i % CHIP_COLORS.length];
+  if(special) return `<div class="chip special">${disp}<small>${id}</small></div>`;
+  return `<div class="chip" style="border-color:${c};background:color-mix(in srgb,${c} 12%,transparent)">${disp}<small>${id}</small></div>`;
+}
+async function tokenize(text){
+  const chips=document.getElementById('tokChips'), meta=document.getElementById('tokMeta');
+  try{
+    const d = await (await fetch('/api/tokenize?text='+encodeURIComponent(text))).json();
+    chips.innerHTML = d.pieces.map((p,i)=>chipHTML(p,d.ids[i],i,d.ids[i]<16)).join('');
+    const ratio = d.n? (d.chars/d.n).toFixed(2):'—';
+    meta.innerHTML = `<b>${d.n}</b> tokens · <b>${d.chars}</b> characters · <b>${ratio}</b> chars per token`;
+  }catch(e){
+    meta.innerHTML = '<span style="color:var(--crit)">Live tokenizer offline — run <code>py scripts/server.py 8017</code> and open <code>http://127.0.0.1:8017</code></span>';
+  }
+}
+async function loadTokStats(){
+  try{
+    const d = await (await fetch('data/tokenizer.json')).json();
+    const max = Math.max(...d.hist.map(h=>h.count));
+    document.getElementById('tokHist').innerHTML = d.hist.map(h=>
+      `<div class="hbar"><div class="hl">${h.len}</div><div class="ht"><div class="hf" style="width:${h.count/max*100}%" data-tip="${h.len}-char chunks: ${h.count.toLocaleString()}"></div></div></div>`).join('');
+    document.getElementById('tokLongest').innerHTML = d.longest.slice(0,10).map(t=>
+      `<div class="chip" style="border-color:var(--s2);background:color-mix(in srgb,var(--s2) 10%,transparent)">${esc(t.tok)}<small>${t.id}</small></div>`).join('');
+    document.getElementById('tokSpecials').innerHTML = d.specials.map(s=>
+      `<div class="chip special">${esc(s.tok)}<small>${s.id}</small></div>`).join('');
+  }catch(e){}
+}
+const tokInput=document.getElementById('tokInput');
+let tokTimer;
+tokInput.addEventListener('input',()=>{clearTimeout(tokTimer);tokTimer=setTimeout(()=>tokenize(tokInput.value),150);});
+loadTokStats();
+tokenize(tokInput.value);
+
+// ---- Training panel (live poll) ----
+function lossChart(hist){
+  if(!hist || !hist.length) return '<div style="color:var(--muted);padding:24px 0">no data points yet…</div>';
+  const W=680,H=240,pl=42,pr=14,pt=12,pb=24;
+  const steps=hist.map(h=>h.step);
+  const all=hist.flatMap(h=>[h.train,h.val].filter(v=>v!=null));
+  const y0=Math.max(0,Math.floor(Math.min(...all)*10)/10-0.05), y1=Math.ceil(Math.max(...all)*10)/10;
+  const xmax=Math.max(...steps)||1;
+  const sx=s=>pl+(s/xmax)*(W-pl-pr);
+  const sy=v=>pt+(1-(v-y0)/((y1-y0)||1))*(H-pt-pb);
+  const line=(key,color)=>{
+    const pts=hist.filter(h=>h[key]!=null).map(h=>`${sx(h.step).toFixed(1)},${sy(h[key]).toFixed(1)}`).join(' ');
+    return pts?`<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"/>`:'';
+  };
+  let grid='';
+  for(let i=0;i<=4;i++){const v=y0+(y1-y0)*i/4, yy=sy(v);
+    grid+=`<line x1="${pl}" y1="${yy}" x2="${W-pr}" y2="${yy}" stroke="var(--grid)" stroke-width="1"/>`+
+      `<text x="${pl-6}" y="${yy+3}" text-anchor="end" font-size="10" fill="var(--muted)">${v.toFixed(1)}</text>`;}
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;overflow:visible">${grid}`+
+    line('train','var(--s1)')+line('val','var(--s6)')+
+    `<text x="${pl}" y="${H-4}" font-size="10" fill="var(--muted)">step 0</text>`+
+    `<text x="${W-pr}" y="${H-4}" text-anchor="end" font-size="10" fill="var(--muted)">step ${xmax.toLocaleString()}</text></svg>`+
+    `<div class="legend"><span><i style="background:var(--s1)"></i>train loss</span><span><i style="background:var(--s6)"></i>validation loss</span></div>`;
+}
+async function pollTraining(){
+  try{
+    const m=await (await fetch('/api/metrics')).json();
+    const stats=document.getElementById('trainStats');
+    if(!m || m.status==='no run yet' || !m.history){
+      stats.innerHTML='<div style="color:var(--muted)">No run yet — start <code>py src/train/train.py</code></div>'; return;
+    }
+    const live=m.status==='training';
+    const ppl = m.val_loss? Math.round(Math.exp(m.val_loss)) : '—';
+    const cards=[['loss',m.train_loss],['val loss',m.val_loss??'—'],['perplexity',ppl],['step',m.step.toLocaleString()+' / '+m.max_iters.toLocaleString()],
+      ['speed',(m.tok_per_s/1000).toFixed(1)+'k tok/s'],['VRAM',m.peak_gb+' GB'],['ETA',live?m.eta_min+' min':'complete']];
+    stats.innerHTML=cards.map(s=>`<div class="st"><div class="v">${s[1]}</div><div class="k">${s[0]}</div></div>`).join('')+
+      (live?'<div class="st"><div class="v"><span class="pulse"></span></div><div class="k">training</div></div>':'');
+    document.getElementById('lossChart').innerHTML=lossChart(m.history);
+    document.getElementById('lossLadder').innerHTML=lossLadder(m.val_loss);
+    if(m.sample) document.getElementById('trainSample').textContent=m.sample;
+  }catch(e){}
+}
+setInterval(pollTraining,1500); pollTraining();
+
+// ---- Loss ladder (perplexity scale) ----
+function lossLadder(valLoss){
+  const pts=[{l:10.4,t:'random'},{l:4.7,t:'small SLM'},{l:3.5,t:'GPT-2'},{l:2.5,t:'frontier'},{l:1.7,t:'floor'}];
+  const lo=1.3, hi=10.7, pos=l=>Math.max(2,Math.min(98,2+(hi-l)/(hi-lo)*96));
+  let h='<div class="ladder"><div class="lt"></div>';
+  pts.forEach(p=>{h+=`<div class="tick" style="left:${pos(p.l)}%"></div>`+
+    `<div class="tlab" style="left:${pos(p.l)}%">${p.l}<br>${p.t}</div>`;});
+  if(valLoss){const pp=Math.round(Math.exp(valLoss));
+    h+=`<div class="mk" style="left:${pos(valLoss)}%"></div>`+
+       `<div class="mkl" style="left:${pos(valLoss)}%">ours ${valLoss.toFixed(2)} · ppl ${pp}</div>`;}
+  return h+'</div>';
+}
+
+// ---- Vocabulary browser ----
+let VOCAB_DATA=null, vocabLimit=200;
+async function loadVocab(){
+  try{ VOCAB_DATA=(await (await fetch('data/vocab.json')).json()).tokens; renderVocab(''); }catch(e){}
+}
+function renderVocab(q, reset=true){
+  if(!VOCAB_DATA) return;
+  if(reset) vocabLimit=200;
+  q=(q||'').toLowerCase();
+  const matches = q ? VOCAB_DATA.filter(v=>v.t.toLowerCase().includes(q)) : VOCAB_DATA;
+  const show=matches.slice(0, vocabLimit);
+  const hidden=matches.length-show.length;
+  document.getElementById('vocabMeta').innerHTML=`<b>${matches.length.toLocaleString()}</b> match${matches.length===1?'':'es'} · showing ${show.length.toLocaleString()}`;
+  document.getElementById('vocabList').innerHTML=show.map(v=>{
+    const disp=(esc(v.t).replace(/ /g,'<span class="sp">·</span>'))||'<span class="sp">∅</span>';
+    return `<div class="chip${v.id<16?' special':''}">${disp}<small>${v.id}</small></div>`;
+  }).join('');
+  const btn=document.getElementById('vocabMore');
+  if(hidden>0){ btn.style.display=''; btn.textContent=`Show ${Math.min(1000,hidden).toLocaleString()} more  ·  ${hidden.toLocaleString()} hidden`; }
+  else btn.style.display='none';
+}
+(function(){
+  const vs=document.getElementById('vocabSearch');
+  if(vs){ let vt; vs.addEventListener('input',()=>{clearTimeout(vt);vt=setTimeout(()=>renderVocab(vs.value),120);}); }
+  const mb=document.getElementById('vocabMore');
+  if(mb){ mb.onclick=()=>{ vocabLimit+=1000; renderVocab(document.getElementById('vocabSearch').value, false); }; }
+  loadVocab();
+})();
+
+// ---- Playground (run the real model) ----
+(function(){
+  const btn=document.getElementById('playBtn'), inp=document.getElementById('playPrompt'), out=document.getElementById('playOut');
+  if(!btn) return;
+  async function gen(){
+    out.innerHTML='<span style="color:var(--muted)">your model is thinking…</span>';
+    btn.disabled=true;
+    try{
+      const d=await (await fetch('/api/generate?tokens=70&temp=0.8&prompt='+encodeURIComponent(inp.value))).json();
+      if(d.error){ out.textContent='Model not loaded on the server (train a checkpoint first).'; }
+      else out.innerHTML=`<span style="color:var(--ink);font-weight:600">${esc(d.prompt)}</span><span style="color:var(--s1)">${esc(d.generated)}</span>`;
+    }catch(e){ out.textContent='Generation failed — is the server running?'; }
+    btn.disabled=false;
+  }
+  btn.onclick=gen;
+  inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); gen(); }});
+})();
+
+// ---- 3D embedding map (real embeddings, vanilla canvas) ----
+(function(){
+  const cv=document.getElementById('embCanvas'); if(!cv) return;
+  const hover=document.getElementById('embHover');
+  const colors={word:'#2a78d6',cap:'#eda100',num:'#008300',sym:'#eb6834'};
+  let pts=[], rx=0.4, ry=0.6, drag=false, lx=0, ly=0, auto=true, proj=[];
+  const dpr=Math.min(2, window.devicePixelRatio||1);
+  function resize(){ cv.width=cv.clientWidth*dpr; cv.height=cv.clientHeight*dpr; }
+  function project(p){
+    const cy=Math.cos(ry), sy=Math.sin(ry), cx=Math.cos(rx), sx=Math.sin(rx);
+    const x1=p.x*cy - p.z*sy, z1=p.x*sy + p.z*cy;
+    const y1=p.y*cx - z1*sx, z2=p.y*sx + z1*cx;
+    const f=2.2/(2.7+z2);
+    return {sx:cv.width/2 + x1*f*cv.width*0.34, sy:cv.height/2 + y1*f*cv.height*0.34, depth:z2, f};
+  }
+  function draw(){
+    const ctx=cv.getContext('2d');
+    ctx.clearRect(0,0,cv.width,cv.height);
+    proj=pts.map(p=>({p,...project(p)})).sort((a,b)=>a.depth-b.depth);
+    for(const o of proj){
+      ctx.globalAlpha=Math.min(1,0.3+o.f*0.55);
+      ctx.fillStyle=colors[o.p.c]||'#888';
+      ctx.beginPath(); ctx.arc(o.sx,o.sy,Math.max(1.3,o.f*3.4)*dpr,0,7); ctx.fill();
+    }
+    ctx.globalAlpha=1;
+  }
+  function tick(){ if(auto && !drag && pts.length){ ry+=0.0022; draw(); } requestAnimationFrame(tick); }
+  cv.addEventListener('pointerdown',e=>{ drag=true; auto=false; lx=e.clientX; ly=e.clientY; cv.style.cursor='grabbing'; });
+  window.addEventListener('pointerup',()=>{ drag=false; cv.style.cursor='grab'; });
+  window.addEventListener('pointermove',e=>{
+    if(drag){ ry+=(e.clientX-lx)*0.008; rx=Math.max(-1.4,Math.min(1.4,rx+(e.clientY-ly)*0.008)); lx=e.clientX; ly=e.clientY; draw(); return; }
+    const rect=cv.getBoundingClientRect();
+    if(e.clientX<rect.left||e.clientY<rect.top||e.clientX>rect.right||e.clientY>rect.bottom) return;
+    const mx=(e.clientX-rect.left)*dpr, my=(e.clientY-rect.top)*dpr;
+    let best=null, bd=350*dpr;
+    for(const o of proj){ const d=(o.sx-mx)**2+(o.sy-my)**2; if(d<bd){ bd=d; best=o; } }
+    hover.innerHTML = best? `nearest point: <b>"${esc(best.p.w)}"</b>` : 'Drag to rotate · hover a point for its word';
+  });
+  window.addEventListener('resize',()=>{ resize(); draw(); });
+  (async()=>{ try{ pts=(await (await fetch('data/embed3d.json')).json()).points; resize(); draw(); tick(); }catch(e){} })();
+})();
+
+// ---- real weights inspector ----
+(function(){
+  const sel=document.getElementById('wSelect'); if(!sel) return;
+  let W=null;
+  const nice=n=>n.replace('blocks.','block ').replace('.attn.',' · attn ').replace('.ffn.',' · mlp ')
+    .replace('.attn_norm',' · attn-norm').replace('.ffn_norm',' · mlp-norm')
+    .replace('tok_emb.weight','token embeddings').replace(/^norm\.weight$/,'final norm').replace('.weight','');
+  function show(i){
+    const c=W.components[i]; if(!c) return;
+    document.getElementById('wStats').innerHTML=[['params',c.n.toLocaleString()],['mean',c.mean],['std',c.std],['min',c.min],['max',c.max]]
+      .map(s=>`<div class="st"><div class="v" style="font-size:19px">${s[1]}</div><div class="k">${s[0]}</div></div>`).join('');
+    const mx=Math.max(...c.hist);
+    document.getElementById('wHist').innerHTML=c.hist.map((h,k)=>
+      `<div class="hbar"><div class="hl" style="width:44px">${c.edges[k]>=0?'+':''}${c.edges[k]}</div><div class="ht"><div class="hf" style="width:${h/mx*100}%" data-tip="${c.edges[k]} to ${c.edges[k+1]}: ${h.toLocaleString()} weights"></div></div></div>`).join('');
+    document.getElementById('wSample').textContent=c.sample.join(',   ');
+  }
+  (async()=>{
+    try{ W=await (await fetch('data/weights.json')).json(); }catch(e){ return; }
+    sel.innerHTML=W.components.map((c,i)=>`<option value="${i}">${nice(c.name)}  (${c.shape.join('×')})</option>`).join('');
+    show(0);
+    sel.addEventListener('change',()=>show(+sel.value));
+  })();
+})();
+
+renderAll();
+</script>
+</body>
+</html>

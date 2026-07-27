@@ -1,0 +1,335 @@
+{
+  "vocab_size": 32000,
+  "specials": [
+    {
+      "tok": "<|endoftext|>",
+      "id": 0
+    },
+    {
+      "tok": "<|pad|>",
+      "id": 1
+    },
+    {
+      "tok": "<|system|>",
+      "id": 2
+    },
+    {
+      "tok": "<|user|>",
+      "id": 3
+    },
+    {
+      "tok": "<|assistant|>",
+      "id": 4
+    },
+    {
+      "tok": "<|end|>",
+      "id": 5
+    },
+    {
+      "tok": "<|tool_call|>",
+      "id": 6
+    },
+    {
+      "tok": "<|tool_result|>",
+      "id": 7
+    }
+  ],
+  "examples": [
+    {
+      "text": "The cat sat on the mat.",
+      "pieces": [
+        "The",
+        " cat",
+        " sat",
+        " on",
+        " the",
+        " mat",
+        "."
+      ],
+      "ids": [
+        476,
+        2410,
+        2599,
+        348,
+        277,
+        1303,
+        29
+      ],
+      "n": 7,
+      "chars": 23
+    },
+    {
+      "text": "Photosynthesis converts sunlight into chemical energy.",
+      "pieces": [
+        "Phot",
+        "osynthesis",
+        " converts",
+        " sunlight",
+        " into",
+        " chemical",
+        " energy",
+        "."
+      ],
+      "ids": [
+        16427,
+        14876,
+        16800,
+        7856,
+        661,
+        2455,
+        1312,
+        29
+      ],
+      "n": 8,
+      "chars": 54
+    },
+    {
+      "text": "def fib(n): return n if n < 2 else fib(n-1) + fib(n-2)",
+      "pieces": [
+        "def",
+        " fib",
+        "(",
+        "n",
+        "):",
+        " return",
+        " n",
+        " if",
+        " n",
+        " <",
+        " 2",
+        " else",
+        " fib",
+        "(",
+        "n",
+        "-",
+        "1",
+        ")",
+        " +",
+        " fib",
+        "(",
+        "n",
+        "-",
+        "2",
+        ")"
+      ],
+      "ids": [
+        7824,
+        5142,
+        23,
+        93,
+        2373,
+        2208,
+        323,
+        733,
+        323,
+        5796,
+        444,
+        3216,
+        5142,
+        23,
+        93,
+        28,
+        32,
+        24,
+        4061,
+        5142,
+        23,
+        93,
+        28,
+        33,
+        24
+      ],
+      "n": 25,
+      "chars": 54
+    },
+    {
+      "text": "The witch cackled: 'Foolish mortal, your code has bugs.'",
+      "pieces": [
+        "The",
+        " witch",
+        " c",
+        "ack",
+        "led",
+        ":",
+        " '",
+        "F",
+        "ool",
+        "ish",
+        " mortal",
+        ",",
+        " your",
+        " code",
+        " has",
+        " bugs",
+        ".'"
+      ],
+      "ids": [
+        476,
+        19337,
+        284,
+        610,
+        981,
+        41,
+        1877,
+        53,
+        758,
+        604,
+        25129,
+        27,
+        504,
+        3496,
+        537,
+        11592,
+        8097
+      ],
+      "n": 17,
+      "chars": 56
+    },
+    {
+      "text": "antidisestablishmentarianism",
+      "pieces": [
+        "ant",
+        "idis",
+        "establish",
+        "ment",
+        "arianism"
+      ],
+      "ids": [
+        419,
+        30263,
+        26714,
+        380,
+        30072
+      ],
+      "n": 5,
+      "chars": 28
+    }
+  ],
+  "compression": 4.52,
+  "hist": [
+    {
+      "len": 1,
+      "count": 69198
+    },
+    {
+      "len": 2,
+      "count": 40778
+    },
+    {
+      "len": 3,
+      "count": 71731
+    },
+    {
+      "len": 4,
+      "count": 72962
+    },
+    {
+      "len": 5,
+      "count": 54518
+    },
+    {
+      "len": 6,
+      "count": 35814
+    },
+    {
+      "len": 7,
+      "count": 26716
+    },
+    {
+      "len": 8,
+      "count": 24195
+    },
+    {
+      "len": 9,
+      "count": 17826
+    },
+    {
+      "len": 10,
+      "count": 11803
+    },
+    {
+      "len": 11,
+      "count": 8050
+    },
+    {
+      "len": 12,
+      "count": 4578
+    },
+    {
+      "len": 13,
+      "count": 2189
+    },
+    {
+      "len": 14,
+      "count": 1133
+    },
+    {
+      "len": 15,
+      "count": 384
+    }
+  ],
+  "longest": [
+    {
+      "tok": "disproportionately",
+      "id": 24269
+    },
+    {
+      "tok": "telecommunications",
+      "id": 25361
+    },
+    {
+      "tok": "interdisciplinary",
+      "id": 20549
+    },
+    {
+      "tok": "industrialization",
+      "id": 28953
+    },
+    {
+      "tok": "multidisciplinary",
+      "id": 28648
+    },
+    {
+      "tok": "neurodegenerative",
+      "id": 29903
+    },
+    {
+      "tok": "environmentalists",
+      "id": 29059
+    },
+    {
+      "tok": "neurotransmitters",
+      "id": 26648
+    },
+    {
+      "tok": "unconstitutional",
+      "id": 28806
+    },
+    {
+      "tok": "responsibilities",
+      "id": 9809
+    },
+    {
+      "tok": "gastrointestinal",
+      "id": 15589
+    },
+    {
+      "tok": "disproportionate",
+      "id": 30688
+    },
+    {
+      "tok": "entrepreneurship",
+      "id": 27520
+    },
+    {
+      "tok": "characterization",
+      "id": 20383
+    },
+    {
+      "tok": "neurotransmitter",
+      "id": 25808
+    }
+  ],
+  "corpus_docs": 168000,
+  "corpus_tokens": 200220599
+}

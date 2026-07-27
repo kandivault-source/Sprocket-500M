@@ -1,0 +1,55 @@
+# ---------------------------------------------------------------- MUST be pushed
+# data/synthetic/*.jsonl  (~37 MB) is the SFT corpus. The cloud pod clones this
+# repo to get it — it is NOT regenerable on the box. Do not add it here.
+
+# ---------------------------------------------------------------- never push
+# Tokenized corpora: 350 MB locally, 40-200 GB after a real build. The pod
+# rebuilds these from FineWeb-Edu via scripts/build_corpus.py.
+data/processed/*.bin
+data/processed/*.npz
+data/processed/*.manifest.json
+data/raw/
+!data/raw/.gitkeep
+
+# Checkpoints — 500 MB each locally, ~6 GB for the 500m with optimizer state.
+checkpoints/
+*.pt
+*.pt.tmp
+*.safetensors
+
+# Exported models (regenerate with scripts/export_hf.py)
+out/
+hf-*/
+
+# Backups written by finalize_tokenizer.py / scrub_sft.py
+*.bak
+*.mojibake.bak
+
+# Live dashboard state
+dashboard/data/metrics*.json
+
+# Eval output (regenerate with eval/persona_battery.py)
+eval/persona_results.json
+
+# Scratch
+scratch_ckpt*/
+_shards/
+*.log
+
+# ---------------------------------------------------------------- secrets
+# HF_TOKEN / RUNPOD_API_KEY belong in pod env vars, never in the repo.
+# Anything committed here is in the git history permanently, even if deleted.
+.env
+.env.*
+*.key
+*.token
+secrets.json
+
+# Python / OS
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,13 @@
+# Sprocket — training/eval dependencies.
+# torch is intentionally NOT pinned here: the RunPod PyTorch image already ships
+# a CUDA-matched build, and reinstalling it would pull a wheel that mismatches
+# the driver. Install torch only on a bare box.
+tokenizers>=0.20
+transformers>=4.45
+huggingface_hub>=0.25
+pyarrow>=15
+numpy>=1.26
+tqdm>=4.66
+
+# Benchmarking (optional — only needed to produce published-style eval numbers).
+# lm-eval>=0.4.5
