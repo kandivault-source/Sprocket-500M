@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Sprocket - one-shot cloud bootstrap. Runs on the rented pod.
+# Sprocket - one-shot cloud bootstrap. Runs on the rented pod.
 #
 # Corpus -> pretrain -> SFT -> HF export -> push to the Hub -> terminate the pod.
 #
 # IDEMPOTENT BY DESIGN. Every stage resumes. If the pod is preempted, relaunch
-# the identical command and it continues where it stopped - that is the entire
+# the identical command and it continues where it stopped - that is the entire
 # point, because spot instances WILL die mid-run.
 #
 # Requires a NETWORK VOLUME mounted at /workspace. Container disk is ephemeral;
@@ -19,7 +19,7 @@
 #   SUBSET        FineWeb-Edu subset         (default sample/100BT)
 #   PRESET        model preset               (default 500m)
 #   CTX           context length             (default 2048)
-#   MICRO_BATCH   per-step micro batch       (default 32 - big on 80GB, see below)
+#   MICRO_BATCH   per-step micro batch       (default 12 at ctx2048)
 #   GRAD_ACCUM    gradient accumulation      (default 4)
 #   MAX_ITERS     pretrain steps             (default 0 = derive from TOKENS)
 #   AUTO_STOP     terminate pod when done    (default 1)
@@ -40,7 +40,7 @@ HF_REPO="${HF_REPO:-}"
 
 MAX_HOURS="${MAX_HOURS:-200}"
 # torch.compile: MEASURED 1.70x on H100 (73,252 -> 126,226 tok/s) and it also cuts
-# VRAM 62 -> 43 GB. Needs an image with torch >= 2.5 (use the 2.8 image) - leave
+# VRAM 62 -> 43 GB. Needs an image with torch >= 2.5 (use the 2.8 image) - leave
 # COMPILE=0 only if compilation itself fails. Costs ~2 min of warmup, once.
 COMPILE="${COMPILE:-1}"
 COMPILE_FLAG=""
@@ -55,7 +55,7 @@ mkdir -p "$WORK"; cd "$WORK"
 # someone notices, which on a weekend is ~$150.
 terminate_pod() {
   local reason="$1"
-  log "TERMINATING POD - $reason"
+  log "TERMINATING POD - $reason"
   [ -z "${RUNPOD_POD_ID:-}" ] && { log "  no RUNPOD_POD_ID; STOP THE POD MANUALLY"; return; }
   runpodctl remove pod "$RUNPOD_POD_ID" && return 0
   # Fallback if runpodctl is missing/broken in the image: hit the API directly.
@@ -66,7 +66,7 @@ terminate_pod() {
       -d "{\"query\":\"mutation{podTerminate(input:{podId:\\\"${RUNPOD_POD_ID}\\\"})}\"}" \
       >/dev/null && { log "  terminated via API"; return 0; }
   fi
-  log "  !! COULD NOT SELF-TERMINATE - STOP THE POD MANUALLY, IT IS STILL BILLING"
+  log "  !! COULD NOT SELF-TERMINATE - STOP THE POD MANUALLY, IT IS STILL BILLING"
 }
 
 on_exit() {
@@ -75,7 +75,7 @@ on_exit() {
   if [ "$code" -eq 0 ]; then
     log "pipeline finished cleanly"
   else
-    log "!! PIPELINE FAILED (exit $code) - see the log above"
+    log "!! PIPELINE FAILED (exit $code) - see the log above"
     log "!! state is on the volume; fix and relaunch to resume"
   fi
   [ "${AUTO_STOP:-1}" = "1" ] && terminate_pod "exit code $code"
@@ -183,7 +183,7 @@ def _corpus():
     print(f"         {n:,} SFT conversations present")
 chk("SFT corpus shipped in the repo", _corpus)
 
-# Writability of the eventual destination - a bad token should not surface on day 5.
+# Writability of the eventual destination - a bad token should not surface on day 5.
 if os.environ.get("HF_TOKEN") and os.environ.get("HF_REPO"):
     def _hf():
         from huggingface_hub import HfApi
@@ -202,7 +202,7 @@ else:
 if fail:
     print(f"\nPREFLIGHT FAILED: {fail}")
     sys.exit(1)
-print("\n  preflight OK - safe to spend GPU time")
+print("\n  preflight OK - safe to spend GPU time")
 PY
 
 # ---------------------------------------------------------------- 2. corpus
@@ -251,7 +251,7 @@ api.upload_folder(folder_path="$WORK/hf-$PRESET", repo_id="$HF_REPO", repo_type=
 print("  pushed -> https://huggingface.co/$HF_REPO")
 PY
 else
-  log "HF_TOKEN or HF_REPO unset - skipping publish. Model is at $WORK/hf-$PRESET"
+  log "HF_TOKEN or HF_REPO unset - skipping publish. Model is at $WORK/hf-$PRESET"
   log "  retrieve it with:  runpodctl send $WORK/hf-$PRESET"
 fi
 
@@ -298,5 +298,5 @@ log "  sft ckpt  : $WORK/checkpoints/${PRESET}_sft_final.pt"
 log "  hf model  : $WORK/hf-${PRESET}"
 log "  gguf      : $WORK/sprocket-${PRESET}-q4_k_m.gguf"
 
-# Termination is handled by the EXIT trap above - it fires on success AND on
+# Termination is handled by the EXIT trap above - it fires on success AND on
 # failure, so there is no path where the script ends and the pod keeps billing.
