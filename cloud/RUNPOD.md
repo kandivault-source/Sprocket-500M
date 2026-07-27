@@ -1,5 +1,34 @@
 # Sprocket on RunPod — from one command to a downloadable model
 
+## LIVE CONFIG (provisioned 2026-07-27)
+
+| Item | Value |
+|---|---|
+| Network volume | **`94biin05n5`** ("sprocket-vol", 50 GB, **US-NE-1**) |
+| GPU for both smoke + real run | **H100 SXM 80GB @ $2.69/hr** |
+| Repo | `github.com/kandivault-source/Sprocket-500M` (private) |
+
+**Why US-NE-1:** H100 SXM is only bookable in 9 datacenters and only 5 of those
+support network volumes (AP-JP-1, EU-FR-1, EUR-IS-3, EUR-NO-2, US-NE-1). US-NE-1
+is the US one. A network volume **only attaches to pods in its own datacenter**,
+so this choice is load-bearing — the volume and the GPU must match.
+
+**Stock is "Low" everywhere for H100 SXM.** Budget for a retry loop on launch; if
+it can't allocate, either wait or fall back to EU-FR-1 / EUR-NO-2 (which needs a
+volume there too).
+
+**Measured prices are below the originally quoted ones** — H100 SXM $2.69 (not
+$2.99), RTX PRO 6000 $1.69, H200 SXM $3.59. Recomputed at $2.69: **20B = $130 ·
+50B = $325 · 100B = $649.**
+
+**Run the smoke test on the H100 in US-NE-1, not a cheap 4090 elsewhere.** It
+costs ~$1.35 instead of ~$0.20, and in exchange it validates the exact GPU,
+datacenter, and volume the real run will use — including whether "Low" stock is
+actually obtainable. A 4090 smoke test in another DC proves much less.
+
+---
+
+
 The whole flow is: **one `runpodctl` command → pod boots → corpus → pretrain → SFT →
 HuggingFace export → pushed to the Hub → pod terminates itself.**
 
