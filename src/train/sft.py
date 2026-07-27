@@ -1,11 +1,11 @@
-"""SFT / instruct stage â€” fine-tune a pretrained base checkpoint on the chat corpus.
+"""SFT / instruct stage — fine-tune a pretrained base checkpoint on the chat corpus.
 
 Differs from pretraining in four ways that matter:
   1. Starts from a base checkpoint (--base), with a FRESH optimizer. Carrying the
      pretrain Adam state into SFT drags the model back toward the web distribution.
   2. Much lower LR (2e-5 vs 6e-4). SFT is style/format adaptation, not learning
      language; a pretrain LR here will wreck the base model's knowledge.
-  3. Loss on assistant spans only â€” see src/train/sft_data.py. That module's
+  3. Loss on assistant spans only — see src/train/sft_data.py. That module's
      --self-test is the guard; run it if you touch the template.
   4. Epochs over a small corpus (2-4), not a single pass over a huge one. For
      style, repeated exposure matters more than unique tokens.
@@ -66,7 +66,7 @@ def parse_args():
     p.add_argument("--ckpt-minutes", type=float, default=15.0)
     p.add_argument("--device", default="cuda")
     p.add_argument("--compile", action="store_true",
-                   help="torch.compile â€” measured 1.7x on H100. Linux only; "
+                   help="torch.compile — measured 1.7x on H100. Linux only; "
                         "inductor needs a C compiler, so it is a no-op risk on Windows.")
     return p.parse_args()
 
@@ -152,7 +152,7 @@ if A.base and not A.resume:
         if k in saved and saved[k] != getattr(cfg, k):
             sys.exit(f"base checkpoint mismatch: {k}={saved[k]} vs preset {getattr(cfg,k)}")
     raw_model.load_state_dict(ck["model"])
-    print(f"loaded BASE weights from {A.base} (iter {ck.get('it')}) â€” fresh optimizer",
+    print(f"loaded BASE weights from {A.base} (iter {ck.get('it')}) — fresh optimizer",
           flush=True)
 elif not A.base and not A.resume:
     print("! no --base: fine-tuning from RANDOM init. Fine for a smoke test, "
@@ -221,7 +221,7 @@ def evaluate():
 
 @torch.no_grad()
 def sample(prompt="What are you?"):
-    """Generate through the real chat template â€” same bytes the app will send."""
+    """Generate through the real chat template — same bytes the app will send."""
     model.eval()
     ids = tmpl.render_prompt([{"role": "user", "content": prompt}])
     idx = torch.tensor([ids], device=device)
