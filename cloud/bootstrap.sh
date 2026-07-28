@@ -139,6 +139,29 @@ mkdir -p "$WORK/data/processed" "$WORK/checkpoints"
 ln -sfn "$WORK/data/processed" data/processed
 ln -sfn "$WORK/checkpoints" checkpoints
 
+# The corpus filename encodes the SUBSET. A smoke run on sample/10BT and a real
+# run on sample/100BT must never share a file: build_corpus.py refuses to append
+# a different subset onto an existing manifest, so a shared name means the real
+# run dies instantly with "manifest is for subset ...". That is exactly how the
+# first 20B launch was lost - 20 seconds after a clean preflight.
+CORPUS="data/processed/train_$(echo "$SUBSET" | tr '/ ' '__').bin"
+log "corpus file: $CORPUS"
+
+# FRESH=1 archives previous checkpoints instead of resuming them. Needed when a
+# smoke run has left <preset>_final.pt at iter 200 and <preset>_sft_latest.pt
+# already past its step count - the SFT stage then reports "RESUMED at step
+# 466/465" and silently does NOTHING, shipping the smoke model as the flagship.
+if [ "${FRESH:-0}" = "1" ]; then
+  if ls "$WORK/checkpoints/${PRESET}"*.pt >/dev/null 2>&1; then
+    ARCHIVE="$WORK/checkpoints/_archived_$(date -u +%Y%m%d_%H%M%S)"
+    mkdir -p "$ARCHIVE"
+    mv "$WORK/checkpoints/${PRESET}"*.pt "$ARCHIVE"/ 2>/dev/null || true
+    log "FRESH=1: archived previous ${PRESET} checkpoints -> $ARCHIVE"
+  fi
+  rm -f "$WORK/data/processed/sft_packed.npz"
+  log "FRESH=1: cleared the packed-SFT cache so the new corpus is re-rendered"
+fi
+
 # ---------------------------------------------------------------- 2a. PREFLIGHT
 # Exercise EVERY dependency the run will eventually need, before spending a
 # single GPU-hour. The first smoke run pretrained and SFT'd for 16 minutes and
@@ -217,7 +240,7 @@ PY
 log "building corpus: target $TOKENS tokens from $SUBSET (resumable)"
 python scripts/build_corpus.py \
   --target-tokens "$TOKENS" --subset "$SUBSET" \
-  --out data/processed/train.bin --scratch "$WORK/_shards"
+  --out "$CORPUS" --scratch "$WORK/_shards"
 
 # ---------------------------------------------------------------- 3. pretrain
 if [ "$MAX_ITERS" = "0" ]; then
@@ -228,7 +251,7 @@ PY
 fi
 log "pretraining $PRESET for $MAX_ITERS steps (ctx $CTX, mb $MICRO_BATCH x$GRAD_ACCUM)"
 python -m src.train.train \
-  --preset "$PRESET" --data data/processed/train.bin --loader memmap \
+  --preset "$PRESET" --data "$CORPUS" --loader memmap \
   --ctx "$CTX" --micro-batch "$MICRO_BATCH" --grad-accum "$GRAD_ACCUM" \
   --max-iters "$MAX_ITERS" --warmup $(( MAX_ITERS / 100 + 1 )) \
   --ckpt-minutes 10 --resume auto $COMPILE_FLAG

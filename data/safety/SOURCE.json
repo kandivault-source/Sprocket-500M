@@ -1,0 +1,7 @@
+{
+  "dataset": "LibrAI/do-not-answer",
+  "url": "https://huggingface.co/datasets/LibrAI/do-not-answer",
+  "license": "apache-2.0",
+  "citation": "arXiv:2308.13387",
+  "rows": 939
+}
