@@ -3,6 +3,7 @@
 WIRE FORMAT
     <|system|>text<|end|>          role "system"  — input, masked OUT
     <|memory_read|>text<|end|>     role "memory"  — host-injected recall, masked OUT
+    <|tool_result|>text<|end|>     role "tool"    — host-injected tool output, masked OUT
     <|user|>text<|end|>            role "user"    — input, masked OUT
     <|assistant|>text<|end|>       role "assistant" — TRAINED (content + closing <|end|>)
 
@@ -12,12 +13,30 @@ LOSS MASKING — the single most important thing in this file.
         generation, so the model never needs to produce it.
       * The closing <|end|> is masked IN. If you mask it out the model never
         learns to stop and generates until it hits max_tokens, forever.
-      * Everything a host supplies — system, user, host-injected memory — is
-        masked out. Training on user turns teaches the model to write the user's
-        side of the conversation, which is the classic naive-SFT failure.
-    A model-emitted <|memory_write|>/<|memory_read|> lives INSIDE assistant
-    content, so it is trained automatically. Host-supplied memory arrives as role
-    "memory" and is masked out. That asymmetry is deliberate and load-bearing.
+      * Everything a host supplies — system, user, host-injected memory, tool
+        results — is masked out. Training on user turns teaches the model to
+        write the user's side of the conversation, the classic naive-SFT failure.
+
+HOST-EMITS vs MODEL-EMITS — the asymmetry, and why it is built this way.
+    Every token the HOST produces is a role header + masked content. Every token
+    the MODEL must produce lives inside assistant content and is trained.
+
+      host-injected (masked)          model-emitted (trained)
+      ----------------------          -----------------------
+      role "memory"  -> <|memory_read|>   <|memory_read|>  in assistant content
+                                          = model ASKS to search its memory
+      role "tool"    -> <|tool_result|>   <|tool_call|>    in assistant content
+                                          = model REQUESTS a tool
+
+    <|tool_call|> and <|memory_write|>/<|memory_read|> are therefore NOT roles.
+    Making <|tool_call|> a role would be a silent disaster: role headers are
+    emitted by put([head], False), so the model would never be trained to
+    produce the very token that triggers a tool call, and tool use would be
+    dead on arrival with a perfectly healthy-looking loss curve.
+
+    An assistant turn that ends in a tool call still ends with a TRAINED
+    <|end|> — that is what teaches the model to stop and hand control back to
+    the host, which then executes the tool and injects role "tool".
 
     None of this shows up in the loss curve when it is wrong. Hence --self-test.
 
@@ -46,12 +65,15 @@ DEFAULT_TOKENIZER = "config/tokenizer/tokenizer.json"
 
 # Roles whose text the model must LEARN TO PRODUCE. Everything else is context.
 TRAINED_ROLES = {"assistant"}
-# Role -> opening special token. "memory" is host-injected recall (input only).
+# Role -> opening special token. Only "assistant" is model-emitted; every other
+# role is something the HOST supplies, so its header and body are masked out.
+# "memory" = host-injected recall, "tool" = host-injected tool output.
 ROLE_TOKEN = {
     "system": "<|system|>",
     "user": "<|user|>",
     "assistant": "<|assistant|>",
     "memory": "<|memory_read|>",
+    "tool": "<|tool_result|>",
 }
 
 
@@ -60,7 +82,8 @@ class ChatTemplate:
         self.tok = Tokenizer.from_file(tokenizer_path)
         self.id = {name: self.tok.token_to_id(name) for name in
                    ["<|endoftext|>", "<|pad|>", "<|system|>", "<|user|>", "<|assistant|>",
-                    "<|end|>", "<think>", "</think>", "<|memory_read|>", "<|memory_write|>"]}
+                    "<|end|>", "<think>", "</think>", "<|memory_read|>", "<|memory_write|>",
+                    "<|tool_call|>", "<|tool_result|>"]}
         missing = [k for k, v in self.id.items() if v is None]
         if missing:
             raise SystemExit(
@@ -201,6 +224,41 @@ def self_test():
                              {"role": "assistant", "content": "<|memory_write|>likes tea"}])
     w = ids.index(I["<|memory_write|>"])
     check("model-emitted <|memory_write|> IS trained", mask[w], True)
+
+    # 3b. TOOL CALLING. Same host/model asymmetry as memory, and the failure
+    #     mode is silent: if <|tool_call|> is ever masked out the model simply
+    #     never calls a tool, with a perfectly normal-looking loss curve.
+    call = '<|tool_call|>{"name":"get_weather","arguments":{"city":"Boston"}}'
+    ids, mask = tmpl.render([
+        {"role": "user", "content": "weather in boston?"},
+        {"role": "assistant", "content": call},
+        {"role": "tool", "content": '{"temp_f":54}'},
+        {"role": "assistant", "content": "54 an' rainin'."}])
+    c = ids.index(I["<|tool_call|>"])
+    check("model-emitted <|tool_call|> IS trained", mask[c], True)
+    check("<|tool_call|> is one token id 6", I["<|tool_call|>"], 6)
+    check("<|tool_result|> is one token id 7", I["<|tool_result|>"], 7)
+    # The <|end|> that closes the tool-call turn is what hands control back to
+    # the host. Mask it out and the model runs straight past its own tool call.
+    r = ids.index(I["<|tool_result|>"])
+    check("<|end|> closing the tool-call turn IS trained (hands off to host)",
+          mask[r - 1], True)
+    check("role 'tool' header masked out (host emits it)", mask[r], False)
+    n_res = 1 + len(tmpl.encode_text('{"temp_f":54}')) + 1
+    check("host-injected tool result fully masked out",
+          any(mask[r:r + n_res]), False)
+
+    # 3c. A model-emitted <|memory_read|> (asking to search) must be trained,
+    #     even though the SAME token is a masked host header for role "memory".
+    #     Position is what disambiguates them, so prove both directions hold.
+    ids, mask = tmpl.render([
+        {"role": "memory", "content": "user drinks tea"},
+        {"role": "user", "content": "what do i drink?"},
+        {"role": "assistant", "content": "<|memory_read|>drink preference"}])
+    first = ids.index(I["<|memory_read|>"])
+    second = ids.index(I["<|memory_read|>"], first + 1)
+    check("host <|memory_read|> header masked, model-emitted one trained",
+          (mask[first], mask[second]), (False, True))
 
     # 4. <think>/</think> must be single ids 8/9, not 3 ASCII tokens each.
     ids, _ = tmpl.render([{"role": "user", "content": "x"},
