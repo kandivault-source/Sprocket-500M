@@ -13,6 +13,7 @@ Usage:  py scripts/harvest_round.py <run_id> [<run_id> ...]
 """
 import json
 import os
+import re
 import sys
 
 if len(sys.argv) < 2:
@@ -42,14 +43,26 @@ LEGACY_SFT = f"{SYN}/sprocket_instruct.jsonl"
 os.makedirs(SYN, exist_ok=True)
 
 
+# Conversation kinds that are SFT data. "safety" comes from the separate
+# safety round; without it listed here every safety record falls through to the
+# doc branch, finds no "docs" key, and is silently discarded.
+SFT_KINDS = ("know", "safety")
+
+# Roles src/train/sft_data.py can actually render. Anything else makes
+# ChatTemplate.render() raise, and pack() catches that and drops the
+# conversation with no error and no loss-curve signal - so reject it loudly
+# HERE instead of losing it invisibly at training time.
+RENDERABLE = {"system", "user", "assistant", "memory", "tool"}
+
+
 def walk(obj, know, docs):
     if isinstance(obj, dict):
         k = obj.get("kind")
-        if k == "know" and isinstance(obj.get("examples"), list):
+        if k in SFT_KINDS and isinstance(obj.get("examples"), list):
             for e in obj["examples"]:
                 if isinstance(e, dict) and isinstance(e.get("turns"), list) and e["turns"]:
                     know.append(e)
-        elif k and k not in ("know", "brief") and isinstance(obj.get("docs"), list):
+        elif k and k not in SFT_KINDS + ("brief",) and isinstance(obj.get("docs"), list):
             # any doc-bearing pretrain kind: story / convo / prose / article / ...
             for d in obj["docs"]:
                 if isinstance(d, dict) and d.get("text"):
@@ -63,6 +76,57 @@ def walk(obj, know, docs):
     elif isinstance(obj, list):
         for v in obj:
             walk(v, know, docs)
+
+
+THINK_CLOSE = "</think>"
+
+
+def marker_placement_ok(turns):
+    """Reject conversations where a control marker sits in the wrong place.
+
+    The host parses these positionally, so placement IS the contract:
+      * <|tool_call|> must be the ENTIRE assistant turn (optionally after a
+        think block). Prose before it means the host sees chatter where it
+        expects JSON, and one such example teaches the model to narrate before
+        calling. Measured rate in round 14: 1 in 881.
+      * <|memory_write|> must open the turn, so the host can strip it before
+        display.
+      * Neither marker may appear inside a think block, and host-only markers
+        (<|tool_result|>) may never appear in an assistant turn at all.
+    """
+    for t in turns:
+        if t.get("role") != "assistant":
+            # A model-emitted marker in a host turn is nonsense.
+            if any(m in (t.get("content") or "")
+                   for m in ("<|tool_call|>", "<|memory_write|>")):
+                return False
+            continue
+        c = t.get("content") or ""
+        if "<|tool_result|>" in c:
+            return False
+
+        # No marker may appear INSIDE the reasoning block. Note this is strictly
+        # the text between the tags - a <|memory_write|> that precedes <think>
+        # is the correct, documented layout, so "everything before </think>" is
+        # the wrong region to test.
+        for m in re.finditer(r"<think>(.*?)</think>", c, re.S):
+            if any(k in m.group(1) for k in ("<|tool_call|>", "<|memory_write|>",
+                                             "<|memory_read|>")):
+                return False
+
+        rest = c.lstrip()
+        if "<|memory_write|>" in c:
+            if not rest.startswith("<|memory_write|>"):
+                return False
+            rest = rest.split("\n", 1)[1].lstrip() if "\n" in rest else ""
+        # A think block may sit between the save and the rest of the reply.
+        if rest.startswith("<think>") and THINK_CLOSE in rest:
+            rest = rest.split(THINK_CLOSE, 1)[1].lstrip()
+        if "<|tool_call|>" in c and not rest.startswith("<|tool_call|>"):
+            return False
+        if "<|memory_read|>" in c and not rest.startswith("<|memory_read|>"):
+            return False
+    return True
 
 
 def sft_key(e):
@@ -118,13 +182,38 @@ for rid in RUN_IDS:
             except json.JSONDecodeError:
                 pass
 
-# ---- dedup + append ----
-new_know = []
+# ---- clean, validate, dedup, append ----
+# Generators occasionally emit a blank turn (seen: an empty second user turn
+# from a double-texting example). It renders as a bare header+<|end|> pair that
+# teaches nothing, so drop the turn but keep the conversation.
+new_know, bad_role, emptied, misplaced = [], 0, 0, 0
 for e in know_raw:
-    kk = sft_key(e)
+    turns = [t for t in e["turns"]
+             if isinstance(t, dict) and (t.get("content") or "").strip()]
+    if len(turns) != len(e["turns"]):
+        emptied += 1
+    if not turns:
+        continue
+    roles = {t.get("role") for t in turns}
+    if not roles <= RENDERABLE:
+        bad_role += 1
+        print(f"  ! dropped: unrenderable role(s) {sorted(roles - RENDERABLE)}")
+        continue
+    if not any(t.get("role") == "assistant" for t in turns):
+        continue                      # nothing trainable in it
+    if not marker_placement_ok(turns):
+        misplaced += 1
+        continue
+    kk = sft_key({"turns": turns})
     if kk and kk not in sft_seen:
         sft_seen.add(kk)
-        new_know.append({"turns": e["turns"]})
+        new_know.append({"turns": turns})
+if emptied:
+    print(f"  stripped blank turns from {emptied} conversations")
+if bad_role:
+    print(f"  DROPPED {bad_role} conversations with unrenderable roles")
+if misplaced:
+    print(f"  DROPPED {misplaced} conversations with a misplaced control marker")
 if new_know:
     with open(SFT_MASTER, "a", encoding="utf-8") as f:
         for e in new_know:

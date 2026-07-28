@@ -166,14 +166,24 @@ for tag, recs in (("new", newfmt), ("legacy", legacy)):
 sft_tok = ntok([t for r in union for t in rec_texts(r)])
 
 
+# Only user/assistant are CONVERSATIONAL turns. Everything else is host-supplied
+# context: system prompts, injected memory, tool results. A
+# system+user+assistant (or memory+user+assistant, or user+assistant+tool+
+# assistant) example is SINGLE-turn.
+#
+# This bit us once already: counting the system turn inflated multi-turn from
+# 20% to a false 26%. Tool examples are worse - a single tool call produces
+# four turns and two assistant turns, so a naive count would report every one
+# of them as multi-turn and the real ratio would vanish.
+CONVO_ROLES = {"user", "assistant"}
+
+
 def convo_turns(r):
-    """Turns excluding a leading system turn — a system+user+assistant example is
-    single-turn, not multi. Counting the system turn inflated multi-turn by exactly
-    the number of system examples."""
     turns = r.get("turns")
     if not isinstance(turns, list):
         return []
-    return [t for t in turns if isinstance(t, dict) and t.get("role") != "system"]
+    return [t for t in turns
+            if isinstance(t, dict) and t.get("role") in CONVO_ROLES]
 
 
 multi = sum(1 for r in union if len(convo_turns(r)) > 2)
@@ -230,6 +240,53 @@ if n_sys:
           f"system turn not first={sys_not_first}   (both must be 0)")
     print(f"    ok: abstract 'set aside any persona' override prompts={sys_abstract}  "
           f"(expected non-zero — these negate, they don't grant)")
+
+# ------------------------------------- TOOL CALLING + MEMORY (tokens 6/7/10/11)
+# The NEGATIVE fractions are the load-bearing numbers here. A corpus where every
+# tool example calls a tool teaches "a manifest means call something", and a
+# model that fires web_search at "hi" is worse than one with no tools at all.
+# Same for memory: if nothing shows restraint, it saves the weather.
+def has(r, s, role="assistant"):
+    return any(s in (t.get("content") or "")
+               for t in r.get("turns", []) if t.get("role") == role)
+
+
+def role_present(r, role):
+    return any(t.get("role") == role for t in r.get("turns", []))
+
+
+tool_recs = [r for r in union if role_present(r, "tool") or has(r, "<|tool_call|>")]
+manifest = [r for r in union if role_present(r, "system")
+            and has(r, '"name":', role="system")]
+n_call = sum(1 for r in manifest if has(r, "<|tool_call|>"))
+n_nocall = len(manifest) - n_call
+
+mem_recs = [r for r in union if role_present(r, "memory")
+            or has(r, "<|memory_write|>") or has(r, "<|memory_read|>")]
+m_write = sum(1 for r in mem_recs if has(r, "<|memory_write|>"))
+m_read = sum(1 for r in mem_recs if has(r, "<|memory_read|>"))
+m_silent = sum(1 for r in mem_recs
+               if not has(r, "<|memory_write|>") and not has(r, "<|memory_read|>"))
+
+print("\n" + "=" * 74)
+print("TOOL CALLING & MEMORY  (special tokens 6/7 and 10/11)")
+print("=" * 74)
+print(f"  conversations with a tool manifest : {len(manifest):,}   "
+      f"({100*len(manifest)/max(len(union),1):.1f}% of corpus)")
+print(f"    -> calls a tool                  : {n_call:,}   "
+      f"({100*n_call/max(len(manifest),1):.0f}%)")
+print(f"    -> answers WITHOUT calling       : {n_nocall:,}   "
+      f"({100*n_nocall/max(len(manifest),1):.0f}%)   [the restraint slice]")
+print(f"  conversations touching memory      : {len(mem_recs):,}   "
+      f"({100*len(mem_recs)/max(len(union),1):.1f}% of corpus)")
+print(f"    -> emits <|memory_write|>        : {m_write:,}")
+print(f"    -> emits <|memory_read|>         : {m_read:,}")
+print(f"    -> emits NOTHING (uses context)  : {m_silent:,}   "
+      f"({100*m_silent/max(len(mem_recs),1):.0f}%)   [the restraint slice]")
+if not tool_recs:
+    print("  ! NO TOOL DATA — tokens 6/7 stay untrained and tool use will not work")
+if not mem_recs:
+    print("  ! NO MEMORY DATA — tokens 10/11 stay untrained")
 
 # ------------------------------------------------------------------ TOTALS
 print("\n" + "=" * 74)
