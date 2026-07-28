@@ -334,6 +334,27 @@ PY
   ) || log "! GGUF step failed - the HF model is already pushed and safe; convert later"
 fi
 
+# ---------------------------------------------------------------- 8. the log
+# train.log is the ONLY record of throughput, the loss curve, the LR schedule
+# and the corpus-build rates, and until this step it exists nowhere but the
+# network volume - so deleting the volume to stop paying for it would silently
+# destroy the entire training history. Push it to the Hub next to the model.
+# Runs last and never fails the pipeline: the model is already safe by here.
+if [ -n "${HF_TOKEN:-}" ] && [ -n "$HF_REPO" ]; then
+  log "archiving train.log to the Hub"
+  python - <<PY || log "  ! log upload failed (model is already pushed and safe)"
+import os
+from huggingface_hub import HfApi
+api = HfApi(token=os.environ["HF_TOKEN"])
+for src, dst in [("$WORK/train.log", "debug/train.log"),
+                 ("$WORK/watchdog.log", "debug/watchdog.log")]:
+    if os.path.exists(src) and os.path.getsize(src):
+        api.upload_file(path_or_fileobj=src, path_in_repo=dst,
+                        repo_id="$HF_REPO", repo_type="model")
+        print(f"  archived {dst} ({os.path.getsize(src):,} bytes)")
+PY
+fi
+
 log "DONE."
 log "  base ckpt : $WORK/checkpoints/${PRESET}_final.pt"
 log "  sft ckpt  : $WORK/checkpoints/${PRESET}_sft_final.pt"
