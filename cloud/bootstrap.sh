@@ -151,15 +151,26 @@ log "corpus file: $CORPUS"
 # smoke run has left <preset>_final.pt at iter 200 and <preset>_sft_latest.pt
 # already past its step count - the SFT stage then reports "RESUMED at step
 # 466/465" and silently does NOTHING, shipping the smoke model as the flagship.
-if [ "${FRESH:-0}" = "1" ]; then
+#
+# FIRES AT MOST ONCE PER VOLUME. FRESH is passed as a pod ENV VAR, and the whole
+# point of this script is that you relaunch the identical command after a
+# preemption. Without this guard, a spot kill 20 hours into the run would come
+# back up, see FRESH=1 again, and archive the in-progress checkpoints - throwing
+# away the entire run and silently restarting from zero. The marker lives on the
+# volume, so it survives exactly as long as the checkpoints it protects.
+FRESH_MARK="$WORK/.persist/fresh_done"
+if [ "${FRESH:-0}" = "1" ] && [ ! -f "$FRESH_MARK" ]; then
   if ls "$WORK/checkpoints/${PRESET}"*.pt >/dev/null 2>&1; then
     ARCHIVE="$WORK/checkpoints/_archived_$(date -u +%Y%m%d_%H%M%S)"
     mkdir -p "$ARCHIVE"
     mv "$WORK/checkpoints/${PRESET}"*.pt "$ARCHIVE"/ 2>/dev/null || true
-    log "FRESH=1: archived previous ${PRESET} checkpoints -> $ARCHIVE"
+    log "FRESH: archived previous ${PRESET} checkpoints -> $ARCHIVE"
   fi
   rm -f "$WORK/data/processed/sft_packed.npz"
-  log "FRESH=1: cleared the packed-SFT cache so the new corpus is re-rendered"
+  touch "$FRESH_MARK"
+  log "FRESH: cleared the packed-SFT cache; marker set, will not fire again"
+elif [ "${FRESH:-0}" = "1" ]; then
+  log "FRESH requested but already done on this volume - resuming normally"
 fi
 
 # ---------------------------------------------------------------- 2a. PREFLIGHT
