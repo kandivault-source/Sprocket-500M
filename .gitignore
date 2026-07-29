@@ -53,3 +53,7 @@ venv/
 .ipynb_checkpoints/
 .DS_Store
 Thumbs.db
+
+# Run logs ARE deliverables - the loss curves, throughput and corpus-build
+# rates for the released model all live here. Keep them versioned.
+!logs/*.log
