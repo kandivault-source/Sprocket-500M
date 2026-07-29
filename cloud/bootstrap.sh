@@ -268,6 +268,37 @@ python -m src.train.train \
   --ckpt-minutes 10 --resume auto $COMPILE_FLAG
 
 # ---------------------------------------------------------------- 4. SFT
+# SFT_FRESH re-runs ONLY the SFT stage - to fit a NEW instruct corpus onto the
+# base model - while keeping the expensive pretrain checkpoint untouched.
+#
+# Without it, re-running is a silent no-op: --resume auto finds the previous
+# <preset>_sft_latest.pt already at/past its step count and reports
+# "RESUMED at step 466/465" followed by "SFT complete", having trained on
+# nothing. The old model then gets re-exported and pushed as if it were new.
+# That is how you ship the wrong weights and never find out.
+#
+# Pass a TAG, not just 1 (e.g. SFT_FRESH=v2). The marker is per-tag, so a
+# preemption mid-SFT resumes normally instead of restarting, but bumping the
+# tag when the corpus changes again forces a clean re-fit.
+if [ -n "${SFT_FRESH:-}" ] && [ "${SFT_FRESH}" != "0" ]; then
+  SFT_MARK="$WORK/.persist/sft_fresh_${SFT_FRESH}"
+  if [ ! -f "$SFT_MARK" ]; then
+    if ls "$WORK/checkpoints/${PRESET}_sft"*.pt >/dev/null 2>&1; then
+      SFT_ARCHIVE="$WORK/checkpoints/_sft_archived_$(date -u +%Y%m%d_%H%M%S)"
+      mkdir -p "$SFT_ARCHIVE"
+      mv "$WORK/checkpoints/${PRESET}_sft"*.pt "$SFT_ARCHIVE"/ 2>/dev/null || true
+      log "SFT_FRESH=${SFT_FRESH}: archived old SFT checkpoints -> $SFT_ARCHIVE"
+    fi
+    # The packed cache is keyed to nothing - it would silently reuse the OLD
+    # conversations even with a new jsonl on disk.
+    rm -f "$WORK/data/processed/sft_packed.npz"
+    touch "$SFT_MARK"
+    log "SFT_FRESH=${SFT_FRESH}: dropped packed cache; base checkpoint kept"
+  else
+    log "SFT_FRESH=${SFT_FRESH} already applied - resuming SFT normally"
+  fi
+fi
+
 BASE="checkpoints/${PRESET}_final.pt"
 [ -f "$BASE" ] || BASE="checkpoints/${PRESET}_latest.pt"
 log "SFT from $BASE"
