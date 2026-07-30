@@ -358,7 +358,11 @@ def main():
             cur.append(r)
         if cur:
             seg.append(cur)
-        sf = max(seg, key=len)
+        # LAST segment, not longest. The log accumulates every SFT attempt ever
+        # run against this volume - a 465-step smoke run, a 276-step fit that
+        # trained from random init, and the real one. "Longest" would plot the
+        # smoke run; only the most recent segment is the shipped model.
+        sf = seg[-1]
         sft_html = f"""
 <figure>
   <figcaption>Instruct fine-tune (SFT) — loss over the chat corpus</figcaption>

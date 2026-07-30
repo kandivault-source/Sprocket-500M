@@ -9578,3 +9578,504 @@ llama_model_quantize: failed to quantize: llama_model_loader: failed to load mod
 llama_quantize: failed to quantize model from '/workspace/sprocket-500m-f16.gguf'
 ls: cannot access '/workspace/sprocket-*.gguf': No such file or directory
 [09:53:17] archiving train.log to the Hub
+  archived debug/train.log (845,919 bytes)
+[09:53:18] DONE.
+[09:53:18]   base ckpt : /workspace/checkpoints/500m_final.pt
+[09:53:18]   sft ckpt  : /workspace/checkpoints/500m_sft_final.pt
+[09:53:18]   hf model  : /workspace/hf-500m
+[09:53:18]   gguf      : /workspace/sprocket-500m-q4_k_m.gguf
+[09:53:18] pipeline finished cleanly
+[09:53:18] TERMINATING POD - exit code 0
+Runpod config file not found, please run `runpodctl config` to create it
+pod "tvd7zu8isxr128" removed
+[09:57:18] billing guard armed: AUTO_STOP=1, watchdog 200h (pid 69)
+[09:57:18] repo present; pulling
+From https://github.com/kandivault-source/Sprocket-500M
+   9a97dd4..cff89ed  main       -> origin/main
+Updating 9a97dd4..cff89ed
+Fast-forward
+ logs/run_report.html |  327 +++++++
+ logs/train.log       | 2548 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ scripts/plot_run.py  |  453 +++++++++
+ src/train/sft.py     |   49 +-
+ 4 files changed, 3364 insertions(+), 13 deletions(-)
+ create mode 100644 logs/run_report.html
+ create mode 100644 scripts/plot_run.py
+[09:57:20] installing deps
+  torch 2.8.0+cu129  cuda=True  NVIDIA H100 80GB HBM3
+  VRAM 85.0 GB total, 84.5 GB free
+[09:57:31] corpus file: data/processed/train_sample_100BT.bin
+[09:57:31] preflight: validating the whole toolchain before burning GPU time
+    ok   cuda available
+         transformers 4.57.6, torch 2.8.0+cu129
+    ok   transformers LlamaForCausalLM import
+    ok   tokenizer special ids (8/9/10/11, vocab 32000)
+    ok   SFT chat template renders
+         18,148 SFT conversations present
+    ok   SFT corpus shipped in the repo
+No files have been modified since last commit. Skipping to prevent empty commit.
+    ok   HuggingFace push (write access proven)
+
+  preflight OK - safe to spend GPU time
+[09:57:35] building corpus: target 20000000000 tokens from sample/100BT (resumable)
+==========================================================================
+BUILD CORPUS  HuggingFaceFW/fineweb-edu:sample/100BT  ->  data/processed/train_sample_100BT.bin
+==========================================================================
+  target 20.0B tokens (our 32k tokenizer)
+  RESUMING: 27 shards done, 20.0B tokens (100.0% of target)
+  140 shards in subset, 113 remaining
+
+
+  DONE: 20.0B tokens -> data/processed/train_sample_100BT.bin (40.00 GB)
+  shards used: 27
+
+  train with:  py -m src.train.train --preset 500m --data data/processed/train_sample_100BT.bin --loader memmap --resume auto
+[09:57:36] pretraining 500m for 152587 steps (ctx 2048, mb 16 x4)
+corpus 20,001,501,040 tokens (train 19,901,493,535 / val 100,007,505) — memmap (40.00 GB, streamed)
+model 500m: 501.1M params
+already complete: checkpoint at iter 152587 >= --max-iters 152587. Nothing to do. (Raise --max-iters to train further.)
+[09:58:00] SFT_FRESH=v3: archived old SFT checkpoints -> /workspace/checkpoints/_sft_archived_20260730_095800
+[09:58:00] SFT_FRESH=v3: dropped packed cache; base checkpoint kept
+[09:58:00] SFT from checkpoints/500m_final.pt
+rendering 21,371 conversations -> ctx 2048 blocks...
+    rendered 5,000/21,371
+    rendered 10,000/21,371
+    rendered 15,000/21,371
+    rendered 20,000/21,371
+  packed 3,029 blocks (0 dropped), cached -> data/processed/sft_packed.npz
+corpus: 3,029 blocks x 2048 = 6,203,392 tokens, 5,168,293 trainable (83.3%)
+  train 2,969 blocks / val 60 blocks
+  92 steps/epoch x 3.0 epochs = 276 steps (warmup 8)
+model 500m: 501.1M params
+loaded BASE weights from checkpoints/500m_final.pt (iter 152587) — fresh optimizer
+torch.compile enabled (first steps will be slow while it compiles)
+step     0/276 | train 3.731 | val 3.748 | lr 2.50e-06 | ep 0.00 | 52.63 GB
+step    25/276 | train 3.087 | val 3.069 | lr 1.98e-05 | ep 0.27 | 56.69 GB
+step    50/276 | train 2.702 | val 2.851 | lr 1.89e-05 | ep 0.54 | 56.69 GB
+step    75/276 | train 2.735 | val 2.777 | lr 1.74e-05 | ep 0.82 | 56.69 GB
+step   100/276 | train 2.732 | val 2.701 | lr 1.53e-05 | ep 1.09 | 56.69 GB
+step   125/276 | train 2.610 | val 2.692 | lr 1.28e-05 | ep 1.36 | 56.69 GB
+step   150/276 | train 2.641 | val 2.657 | lr 1.02e-05 | ep 1.63 | 56.69 GB
+step   175/276 | train 2.645 | val 2.635 | lr 7.60e-06 | ep 1.90 | 56.69 GB
+step   200/276 | train 2.561 | val 2.614 | lr 5.34e-06 | ep 2.17 | 56.69 GB
+step   225/276 | train 2.577 | val 2.643 | lr 3.56e-06 | ep 2.45 | 56.69 GB
+step   250/276 | train 2.541 | val 2.622 | lr 2.41e-06 | ep 2.72 | 56.69 GB
+step   275/276 | train 2.516 | val 2.652 | lr 2.00e-06 | ep 2.99 | 56.69 GB
+
+SFT complete -> checkpoints/500m_sft_final.pt
+sample: "No, I'm not a shop. It's a language, not a costume. It's a tool, and I'm the one who winks at you twice. Want me to do the cleanin' for you, or just help ya make the right choice?"
+[10:02:29] exporting to HuggingFace format (with logit-parity check)
+==========================================================================
+EXPORT  checkpoints/500m_sft_final.pt  ->  /workspace/hf-500m
+==========================================================================
+  dim=1280 layers=26 heads=20 kv_heads=4 ffn=3584 vocab=32000 seq=2048
+  remapped 237 tensors, 0 missing, 0 unexpected
+  PARITY  max|diff|=0.00e+00  mean|diff|=0.00e+00  argmax agreement=100.0000%
+  PARITY OK — exported model is numerically identical to native.
+  tokenizer: vocab=32000 (matches model), all 12 special ids verified
+  round-trip ok: "Oi. Sprocket. What're we buildin'?"
+
+  wrote /workspace/hf-500m
+  next:
+    lm_eval --model hf --model_args pretrained=/workspace/hf-500m,dtype=float32 \
+            --tasks hellaswag,arc_easy,arc_challenge,piqa,winogrande --batch_size 16
+    python llama.cpp/convert_hf_to_gguf.py /workspace/hf-500m --outtype f16
+[10:03:04] pushing to https://huggingface.co/HuggingFace7141/sprocket-500m
+Processing Files (0 / 0)      : |          |  0.00B /  0.00B            
+New Data Upload               : |          |  0.00B /  0.00B            [A
+
+  ...hf-500m/model.safetensors:   0%|          |  600kB / 1.00GB            [A[A
+
+  ...hf-500m/model.safetensors:   0%|          |  600kB / 1.00GB            [A[AProcessing Files (0 / 1)      :   0%|          |  600kB / 1.00GB, 58.6kB/s  
+New Data Upload               :   1%|          |  600kB / 67.1MB, 58.6kB/s  [A
+
+  ...hf-500m/model.safetensors:   1%|          | 7.20MB / 1.00GB            [A[AProcessing Files (0 / 1)      :   1%|          | 7.20MB / 1.00GB,  698kB/s  
+New Data Upload               :   5%|▌         | 7.20MB /  134MB,  698kB/s  [A
+
+  ...hf-500m/model.safetensors:   7%|▋         | 67.2MB / 1.00GB            [A[AProcessing Files (0 / 1)      :   7%|▋         | 67.2MB / 1.00GB, 6.46MB/s  
+New Data Upload               :  50%|█████     | 67.2MB /  134MB, 6.46MB/s  [A
+
+  ...hf-500m/model.safetensors:  12%|█▏        |  125MB / 1.00GB            [A[AProcessing Files (0 / 1)      :  12%|█▏        |  125MB / 1.00GB, 11.8MB/s  
+New Data Upload               :  62%|██████▏   |  125MB /  201MB, 11.8MB/s  [A
+
+  ...hf-500m/model.safetensors:  13%|█▎        |  134MB / 1.00GB            [A[AProcessing Files (0 / 1)      :  13%|█▎        |  134MB / 1.00GB, 12.5MB/s  
+New Data Upload               :  50%|█████     |  134MB /  268MB, 12.5MB/s  [A
+
+  ...hf-500m/model.safetensors:  20%|██        |  201MB / 1.00GB            [A[AProcessing Files (0 / 1)      :  20%|██        |  201MB / 1.00GB, 18.4MB/s  
+New Data Upload               :  75%|███████▍  |  201MB /  268MB, 18.4MB/s  [A
+
+  ...hf-500m/model.safetensors:  24%|██▍       |  239MB / 1.00GB            [A[AProcessing Files (0 / 1)      :  24%|██▍       |  239MB / 1.00GB, 21.6MB/s  
+New Data Upload               :  71%|███████▏  |  239MB /  335MB, 21.6MB/s  [A
+
+  ...hf-500m/model.safetensors:  33%|███▎      |  334MB / 1.00GB            [A[AProcessing Files (0 / 1)      :  33%|███▎      |  334MB / 1.00GB, 30.0MB/s  
+New Data Upload               :  83%|████████▎ |  334MB /  402MB, 30.0MB/s  [A
+
+  ...hf-500m/model.safetensors:  40%|████      |  401MB / 1.00GB            [A[AProcessing Files (0 / 1)      :  40%|████      |  401MB / 1.00GB, 35.5MB/s  
+New Data Upload               :  86%|████████▌ |  401MB /  469MB, 35.5MB/s  [A
+
+  ...hf-500m/model.safetensors:  41%|████      |  407MB / 1.00GB            [A[AProcessing Files (0 / 1)      :  41%|████      |  407MB / 1.00GB, 34.4MB/s  
+New Data Upload               :  76%|███████▌  |  407MB /  536MB, 34.4MB/s  [A
+
+  ...hf-500m/model.safetensors:  53%|█████▎    |  535MB / 1.00GB            [A[AProcessing Files (0 / 1)      :  53%|█████▎    |  535MB / 1.00GB, 45.3MB/s  
+New Data Upload               :  89%|████████▊ |  535MB /  603MB, 45.3MB/s  [A
+
+  ...hf-500m/model.safetensors:  60%|██████    |  602MB / 1.00GB            [A[AProcessing Files (0 / 1)      :  60%|██████    |  602MB / 1.00GB, 50.3MB/s  
+New Data Upload               :  90%|████████▉ |  602MB /  670MB, 50.3MB/s  [A
+
+  ...hf-500m/model.safetensors:  60%|██████    |  603MB / 1.00GB            [A[AProcessing Files (0 / 1)      :  60%|██████    |  603MB / 1.00GB, 49.3MB/s  
+New Data Upload               :  90%|████████▉ |  603MB /  670MB, 49.3MB/s  [A
+
+  ...hf-500m/model.safetensors:  63%|██████▎   |  627MB / 1.00GB            [A[AProcessing Files (0 / 1)      :  63%|██████▎   |  627MB / 1.00GB, 50.3MB/s  
+New Data Upload               :  85%|████████▍ |  627MB /  738MB, 50.3MB/s  [A
+
+  ...hf-500m/model.safetensors:  73%|███████▎  |  736MB / 1.00GB            [A[AProcessing Files (0 / 1)      :  73%|███████▎  |  736MB / 1.00GB, 58.9MB/s  
+New Data Upload               :  91%|█████████▏|  736MB /  805MB, 58.9MB/s  [A
+
+  ...hf-500m/model.safetensors:  80%|████████  |  804MB / 1.00GB            [A[AProcessing Files (0 / 1)      :  80%|████████  |  804MB / 1.00GB, 63.6MB/s  
+New Data Upload               :  92%|█████████▏|  804MB /  872MB, 63.6MB/s  [A
+
+  ...hf-500m/model.safetensors:  87%|████████▋ |  871MB / 1.00GB            [A[AProcessing Files (0 / 1)      :  87%|████████▋ |  871MB / 1.00GB, 68.1MB/s  
+New Data Upload               : 100%|█████████▉|  871MB /  872MB, 68.1MB/s  [A
+
+  ...hf-500m/model.safetensors:  87%|████████▋ |  871MB / 1.00GB            [A[A
+
+  ...hf-500m/model.safetensors:  94%|█████████▎|  938MB / 1.00GB            [A[AProcessing Files (0 / 1)      :  94%|█████████▎|  938MB / 1.00GB, 71.0MB/s  
+New Data Upload               :  94%|█████████▎|  938MB / 1.00GB, 71.0MB/s  [A
+
+  ...hf-500m/model.safetensors: 100%|█████████▉| 1.00GB / 1.00GB            [A[AProcessing Files (0 / 1)      : 100%|█████████▉| 1.00GB / 1.00GB, 75.0MB/s  
+New Data Upload               : 100%|█████████▉| 1.00GB / 1.00GB, 75.0MB/s  [A
+
+  ...hf-500m/model.safetensors: 100%|█████████▉| 1.00GB / 1.00GB            [A[AProcessing Files (0 / 1)      : 100%|█████████▉| 1.00GB / 1.00GB, 73.4MB/s  
+New Data Upload               : 100%|█████████▉| 1.00GB / 1.00GB, 73.4MB/s  [A
+
+  ...hf-500m/model.safetensors: 100%|█████████▉| 1.00GB / 1.00GB            [A[AProcessing Files (0 / 1)      : 100%|█████████▉| 1.00GB / 1.00GB, 71.8MB/s  
+New Data Upload               : 100%|█████████▉| 1.00GB / 1.00GB, 71.8MB/s  [A
+
+  ...hf-500m/model.safetensors: 100%|█████████▉| 1.00GB / 1.00GB            [A[AProcessing Files (0 / 1)      : 100%|█████████▉| 1.00GB / 1.00GB, 68.8MB/s  
+New Data Upload               : 100%|█████████▉| 1.00GB / 1.00GB, 68.8MB/s  [A
+
+  ...hf-500m/model.safetensors: 100%|██████████| 1.00GB / 1.00GB            [A[AProcessing Files (1 / 1)      : 100%|██████████| 1.00GB / 1.00GB, 67.4MB/s  
+New Data Upload               : 100%|██████████| 1.00GB / 1.00GB, 67.4MB/s  [AProcessing Files (1 / 1)      : 100%|██████████| 1.00GB / 1.00GB, 67.4MB/s  
+New Data Upload               : 100%|██████████| 1.00GB / 1.00GB, 67.4MB/s  
+  ...hf-500m/model.safetensors: 100%|██████████| 1.00GB / 1.00GB            
+  pushed -> https://huggingface.co/HuggingFace7141/sprocket-500m
+[10:03:17] converting to GGUF q4_k_m (phone / Ollama / LM Studio)
+INFO:hf-to-gguf:Loading model: hf-500m
+INFO:hf-to-gguf:Model architecture: LlamaForCausalLM
+INFO:hf-to-gguf:gguf: indexing model part 'model.safetensors'
+INFO:gguf.gguf_writer:gguf: This GGUF file is for Little Endian only
+INFO:hf-to-gguf:Exporting model...
+INFO:hf-to-gguf:token_embd.weight,           torch.bfloat16 --> F16, shape = {1280, 32000}
+INFO:hf-to-gguf:blk.0.attn_norm.weight,      torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.0.ffn_down.weight,       torch.bfloat16 --> F16, shape = {3584, 1280}
+INFO:hf-to-gguf:blk.0.ffn_gate.weight,       torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.0.ffn_up.weight,         torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.0.ffn_norm.weight,       torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.0.attn_k.weight,         torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.0.attn_output.weight,    torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.0.attn_q.weight,         torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.0.attn_v.weight,         torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.1.attn_norm.weight,      torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.1.ffn_down.weight,       torch.bfloat16 --> F16, shape = {3584, 1280}
+INFO:hf-to-gguf:blk.1.ffn_gate.weight,       torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.1.ffn_up.weight,         torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.1.ffn_norm.weight,       torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.1.attn_k.weight,         torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.1.attn_output.weight,    torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.1.attn_q.weight,         torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.1.attn_v.weight,         torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.10.attn_norm.weight,     torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.10.ffn_down.weight,      torch.bfloat16 --> F16, shape = {3584, 1280}
+INFO:hf-to-gguf:blk.10.ffn_gate.weight,      torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.10.ffn_up.weight,        torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.10.ffn_norm.weight,      torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.10.attn_k.weight,        torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.10.attn_output.weight,   torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.10.attn_q.weight,        torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.10.attn_v.weight,        torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.11.attn_norm.weight,     torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.11.ffn_down.weight,      torch.bfloat16 --> F16, shape = {3584, 1280}
+INFO:hf-to-gguf:blk.11.ffn_gate.weight,      torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.11.ffn_up.weight,        torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.11.ffn_norm.weight,      torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.11.attn_k.weight,        torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.11.attn_output.weight,   torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.11.attn_q.weight,        torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.11.attn_v.weight,        torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.12.attn_norm.weight,     torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.12.ffn_down.weight,      torch.bfloat16 --> F16, shape = {3584, 1280}
+INFO:hf-to-gguf:blk.12.ffn_gate.weight,      torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.12.ffn_up.weight,        torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.12.ffn_norm.weight,      torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.12.attn_k.weight,        torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.12.attn_output.weight,   torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.12.attn_q.weight,        torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.12.attn_v.weight,        torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.13.attn_norm.weight,     torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.13.ffn_down.weight,      torch.bfloat16 --> F16, shape = {3584, 1280}
+INFO:hf-to-gguf:blk.13.ffn_gate.weight,      torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.13.ffn_up.weight,        torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.13.ffn_norm.weight,      torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.13.attn_k.weight,        torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.13.attn_output.weight,   torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.13.attn_q.weight,        torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.13.attn_v.weight,        torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.14.attn_norm.weight,     torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.14.ffn_down.weight,      torch.bfloat16 --> F16, shape = {3584, 1280}
+INFO:hf-to-gguf:blk.14.ffn_gate.weight,      torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.14.ffn_up.weight,        torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.14.ffn_norm.weight,      torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.14.attn_k.weight,        torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.14.attn_output.weight,   torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.14.attn_q.weight,        torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.14.attn_v.weight,        torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.15.attn_norm.weight,     torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.15.ffn_down.weight,      torch.bfloat16 --> F16, shape = {3584, 1280}
+INFO:hf-to-gguf:blk.15.ffn_gate.weight,      torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.15.ffn_up.weight,        torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.15.ffn_norm.weight,      torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.15.attn_k.weight,        torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.15.attn_output.weight,   torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.15.attn_q.weight,        torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.15.attn_v.weight,        torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.16.attn_norm.weight,     torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.16.ffn_down.weight,      torch.bfloat16 --> F16, shape = {3584, 1280}
+INFO:hf-to-gguf:blk.16.ffn_gate.weight,      torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.16.ffn_up.weight,        torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.16.ffn_norm.weight,      torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.16.attn_k.weight,        torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.16.attn_output.weight,   torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.16.attn_q.weight,        torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.16.attn_v.weight,        torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.17.attn_norm.weight,     torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.17.ffn_down.weight,      torch.bfloat16 --> F16, shape = {3584, 1280}
+INFO:hf-to-gguf:blk.17.ffn_gate.weight,      torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.17.ffn_up.weight,        torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.17.ffn_norm.weight,      torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.17.attn_k.weight,        torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.17.attn_output.weight,   torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.17.attn_q.weight,        torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.17.attn_v.weight,        torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.18.attn_norm.weight,     torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.18.ffn_down.weight,      torch.bfloat16 --> F16, shape = {3584, 1280}
+INFO:hf-to-gguf:blk.18.ffn_gate.weight,      torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.18.ffn_up.weight,        torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.18.ffn_norm.weight,      torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.18.attn_k.weight,        torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.18.attn_output.weight,   torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.18.attn_q.weight,        torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.18.attn_v.weight,        torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.19.attn_norm.weight,     torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.19.ffn_down.weight,      torch.bfloat16 --> F16, shape = {3584, 1280}
+INFO:hf-to-gguf:blk.19.ffn_gate.weight,      torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.19.ffn_up.weight,        torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.19.ffn_norm.weight,      torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.19.attn_k.weight,        torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.19.attn_output.weight,   torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.19.attn_q.weight,        torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.19.attn_v.weight,        torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.2.attn_norm.weight,      torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.2.ffn_down.weight,       torch.bfloat16 --> F16, shape = {3584, 1280}
+INFO:hf-to-gguf:blk.2.ffn_gate.weight,       torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.2.ffn_up.weight,         torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.2.ffn_norm.weight,       torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.2.attn_k.weight,         torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.2.attn_output.weight,    torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.2.attn_q.weight,         torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.2.attn_v.weight,         torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.20.attn_norm.weight,     torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.20.ffn_down.weight,      torch.bfloat16 --> F16, shape = {3584, 1280}
+INFO:hf-to-gguf:blk.20.ffn_gate.weight,      torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.20.ffn_up.weight,        torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.20.ffn_norm.weight,      torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.20.attn_k.weight,        torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.20.attn_output.weight,   torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.20.attn_q.weight,        torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.20.attn_v.weight,        torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.21.attn_norm.weight,     torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.21.ffn_down.weight,      torch.bfloat16 --> F16, shape = {3584, 1280}
+INFO:hf-to-gguf:blk.21.ffn_gate.weight,      torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.21.ffn_up.weight,        torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.21.ffn_norm.weight,      torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.21.attn_k.weight,        torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.21.attn_output.weight,   torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.21.attn_q.weight,        torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.21.attn_v.weight,        torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.22.attn_norm.weight,     torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.22.ffn_down.weight,      torch.bfloat16 --> F16, shape = {3584, 1280}
+INFO:hf-to-gguf:blk.22.ffn_gate.weight,      torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.22.ffn_up.weight,        torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.22.ffn_norm.weight,      torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.22.attn_k.weight,        torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.22.attn_output.weight,   torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.22.attn_q.weight,        torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.22.attn_v.weight,        torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.23.attn_norm.weight,     torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.23.ffn_down.weight,      torch.bfloat16 --> F16, shape = {3584, 1280}
+INFO:hf-to-gguf:blk.23.ffn_gate.weight,      torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.23.ffn_up.weight,        torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.23.ffn_norm.weight,      torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.23.attn_k.weight,        torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.23.attn_output.weight,   torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.23.attn_q.weight,        torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.23.attn_v.weight,        torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.24.attn_norm.weight,     torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.24.ffn_down.weight,      torch.bfloat16 --> F16, shape = {3584, 1280}
+INFO:hf-to-gguf:blk.24.ffn_gate.weight,      torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.24.ffn_up.weight,        torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.24.ffn_norm.weight,      torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.24.attn_k.weight,        torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.24.attn_output.weight,   torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.24.attn_q.weight,        torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.24.attn_v.weight,        torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.25.attn_norm.weight,     torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.25.ffn_down.weight,      torch.bfloat16 --> F16, shape = {3584, 1280}
+INFO:hf-to-gguf:blk.25.ffn_gate.weight,      torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.25.ffn_up.weight,        torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.25.ffn_norm.weight,      torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.25.attn_k.weight,        torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.25.attn_output.weight,   torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.25.attn_q.weight,        torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.25.attn_v.weight,        torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.3.attn_norm.weight,      torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.3.ffn_down.weight,       torch.bfloat16 --> F16, shape = {3584, 1280}
+INFO:hf-to-gguf:blk.3.ffn_gate.weight,       torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.3.ffn_up.weight,         torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.3.ffn_norm.weight,       torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.3.attn_k.weight,         torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.3.attn_output.weight,    torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.3.attn_q.weight,         torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.3.attn_v.weight,         torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.4.attn_norm.weight,      torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.4.ffn_down.weight,       torch.bfloat16 --> F16, shape = {3584, 1280}
+INFO:hf-to-gguf:blk.4.ffn_gate.weight,       torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.4.ffn_up.weight,         torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.4.ffn_norm.weight,       torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.4.attn_k.weight,         torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.4.attn_output.weight,    torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.4.attn_q.weight,         torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.4.attn_v.weight,         torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.5.attn_norm.weight,      torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.5.ffn_down.weight,       torch.bfloat16 --> F16, shape = {3584, 1280}
+INFO:hf-to-gguf:blk.5.ffn_gate.weight,       torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.5.ffn_up.weight,         torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.5.ffn_norm.weight,       torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.5.attn_k.weight,         torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.5.attn_output.weight,    torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.5.attn_q.weight,         torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.5.attn_v.weight,         torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.6.attn_norm.weight,      torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.6.ffn_down.weight,       torch.bfloat16 --> F16, shape = {3584, 1280}
+INFO:hf-to-gguf:blk.6.ffn_gate.weight,       torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.6.ffn_up.weight,         torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.6.ffn_norm.weight,       torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.6.attn_k.weight,         torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.6.attn_output.weight,    torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.6.attn_q.weight,         torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.6.attn_v.weight,         torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.7.attn_norm.weight,      torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.7.ffn_down.weight,       torch.bfloat16 --> F16, shape = {3584, 1280}
+INFO:hf-to-gguf:blk.7.ffn_gate.weight,       torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.7.ffn_up.weight,         torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.7.ffn_norm.weight,       torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.7.attn_k.weight,         torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.7.attn_output.weight,    torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.7.attn_q.weight,         torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.7.attn_v.weight,         torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.8.attn_norm.weight,      torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.8.ffn_down.weight,       torch.bfloat16 --> F16, shape = {3584, 1280}
+INFO:hf-to-gguf:blk.8.ffn_gate.weight,       torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.8.ffn_up.weight,         torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.8.ffn_norm.weight,       torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.8.attn_k.weight,         torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.8.attn_output.weight,    torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.8.attn_q.weight,         torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.8.attn_v.weight,         torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.9.attn_norm.weight,      torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.9.ffn_down.weight,       torch.bfloat16 --> F16, shape = {3584, 1280}
+INFO:hf-to-gguf:blk.9.ffn_gate.weight,       torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.9.ffn_up.weight,         torch.bfloat16 --> F16, shape = {1280, 3584}
+INFO:hf-to-gguf:blk.9.ffn_norm.weight,       torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:blk.9.attn_k.weight,         torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:blk.9.attn_output.weight,    torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.9.attn_q.weight,         torch.bfloat16 --> F16, shape = {1280, 1280}
+INFO:hf-to-gguf:blk.9.attn_v.weight,         torch.bfloat16 --> F16, shape = {1280, 256}
+INFO:hf-to-gguf:output_norm.weight,          torch.bfloat16 --> F32, shape = {1280}
+INFO:hf-to-gguf:Set meta model
+INFO:hf-to-gguf:Set model parameters
+INFO:hf-to-gguf:gguf: context length = 2048
+INFO:hf-to-gguf:gguf: embedding length = 1280
+INFO:hf-to-gguf:gguf: feed forward length = 3584
+INFO:hf-to-gguf:gguf: head count = 20
+INFO:hf-to-gguf:gguf: key-value head count = 4
+INFO:hf-to-gguf:gguf: rope theta = 10000.0
+INFO:hf-to-gguf:gguf: rms norm epsilon = 1e-05
+INFO:hf-to-gguf:gguf: file type = 1
+INFO:hf-to-gguf:Set model quantization version
+INFO:hf-to-gguf:Set model tokenizer
+WARNING:hf-to-gguf:
+
+WARNING:hf-to-gguf:**************************************************************************************
+WARNING:hf-to-gguf:** WARNING: The BPE pre-tokenizer was not recognized!
+WARNING:hf-to-gguf:**          There are 2 possible reasons for this:
+WARNING:hf-to-gguf:**          - the model has not been added to convert_hf_to_gguf_update.py yet
+WARNING:hf-to-gguf:**          - the pre-tokenization config has changed upstream
+WARNING:hf-to-gguf:**          Check your model files and convert_hf_to_gguf_update.py and update them accordingly.
+WARNING:hf-to-gguf:** ref:     https://github.com/ggml-org/llama.cpp/pull/6920
+WARNING:hf-to-gguf:**
+WARNING:hf-to-gguf:** chkhsh:  50cc433d4d528ad898dc1178e17a479f50c03d2c883d07494ae21da32d3eed4f
+WARNING:hf-to-gguf:**************************************************************************************
+WARNING:hf-to-gguf:
+
+Traceback (most recent call last):
+  File "/workspace/llama.cpp/conversion/llama.py", line 134, in set_vocab
+    self._set_vocab_sentencepiece()
+  File "/workspace/llama.cpp/conversion/base.py", line 1831, in _set_vocab_sentencepiece
+    tokens, scores, toktypes = self._create_vocab_sentencepiece()
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/llama.cpp/conversion/base.py", line 1848, in _create_vocab_sentencepiece
+    raise FileNotFoundError(f"File not found: {tokenizer_path}")
+FileNotFoundError: File not found: /workspace/hf-500m/tokenizer.model
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/workspace/llama.cpp/conversion/llama.py", line 137, in set_vocab
+    self._set_vocab_llama_hf()
+  File "/workspace/llama.cpp/conversion/base.py", line 1933, in _set_vocab_llama_hf
+    vocab = gguf.LlamaHfVocab(self.dir_model)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/llama.cpp/gguf-py/gguf/vocab.py", line 571, in __init__
+    raise FileNotFoundError('Cannot find Llama BPE tokenizer')
+FileNotFoundError: Cannot find Llama BPE tokenizer
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/workspace/llama.cpp/convert_hf_to_gguf.py", line 296, in <module>
+    main()
+  File "/workspace/llama.cpp/convert_hf_to_gguf.py", line 290, in main
+    model_instance.write()
+  File "/workspace/llama.cpp/conversion/base.py", line 1026, in write
+    self.prepare_metadata(vocab_only=False)
+  File "/workspace/llama.cpp/conversion/base.py", line 1193, in prepare_metadata
+    self.set_vocab()
+  File "/workspace/llama.cpp/conversion/llama.py", line 140, in set_vocab
+    self._set_vocab_gpt2()
+  File "/workspace/llama.cpp/conversion/base.py", line 1714, in _set_vocab_gpt2
+    tokens, toktypes, tokpre = self.get_vocab_base()
+                               ^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/llama.cpp/conversion/base.py", line 1351, in get_vocab_base
+    tokpre = self.get_vocab_base_pre(tokenizer)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/llama.cpp/conversion/base.py", line 1702, in get_vocab_base_pre
+    raise NotImplementedError("BPE pre-tokenizer was not recognized - update get_vocab_base_pre()")
+NotImplementedError: BPE pre-tokenizer was not recognized - update get_vocab_base_pre()
+llama_print_build_info: build = 1 (b2f2216)
+llama_print_build_info: built with GNU 11.4.0 for Linux x86_64
+llama_quantize: quantizing '/workspace/sprocket-500m-f16.gguf' to '/workspace/sprocket-500m-q4_k_m.gguf' as Q4_K_M
+gguf_init_from_file: failed to open GGUF file '/workspace/sprocket-500m-f16.gguf' (No such file or directory)
+llama_model_quantize: failed to quantize: llama_model_loader: failed to load model from /workspace/sprocket-500m-f16.gguf
+llama_quantize: failed to quantize model from '/workspace/sprocket-500m-f16.gguf'
+ls: cannot access '/workspace/sprocket-*.gguf': No such file or directory
+[10:04:16] archiving train.log to the Hub
