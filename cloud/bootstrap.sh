@@ -324,6 +324,22 @@ if [ -f "$CAPS" ] && [ "$UPWEIGHT" -gt 1 ]; then
   log "SFT upweight: capability conversations x${UPWEIGHT}"
 fi
 
+# EMIT_UPWEIGHT adds extra copies of ONLY the token-emitting conversations.
+# After the x4 run tool calling worked and memory writing did not, purely on
+# exposure count (590 tool-emitting convos vs 237 memory_write). This lifts the
+# emitters without disturbing the restraint balance - every negative example
+# stays at its base weight in the main caps file.
+CAPS_EMIT="data/synthetic/sprocket_caps_emit.jsonl"
+EMIT_UPWEIGHT="${EMIT_UPWEIGHT:-0}"
+if [ -f "$CAPS_EMIT" ] && [ "$EMIT_UPWEIGHT" -gt 0 ]; then
+  i=0
+  while [ "$i" -lt "$EMIT_UPWEIGHT" ]; do
+    SFT_DATA="$SFT_DATA $CAPS_EMIT"
+    i=$((i + 1))
+  done
+  log "SFT upweight: token-emitting conversations +${EMIT_UPWEIGHT} extra copies"
+fi
+
 python -m src.train.sft \
   --base "$BASE" --preset "$PRESET" --ctx "$CTX" \
   --data $SFT_DATA \

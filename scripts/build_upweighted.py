@@ -137,6 +137,31 @@ def main():
         for turns in out:
             f.write(json.dumps({"turns": turns}, ensure_ascii=False) + "\n")
 
+    # A SECOND, narrower file: only the conversations that actually EMIT a
+    # control token. Measured after the 4x run - tool calling imprinted and
+    # memory writing did not, and the reason is exposure count, not weighting:
+    #   <|tool_call|>    590 emitting convos  x4 = 2,360
+    #   <|memory_write|> 237 emitting convos  x4 =   948
+    # Tools got 2.5x the gradient signal. Listing this file a few extra times
+    # lifts the emitters without touching the restraint/negative balance, since
+    # the negatives all stay at their base weight in the main caps file.
+    emit = [t for t in out
+            if any(m in " ".join(x.get("content", "") for x in t
+                                 if x.get("role") == "assistant")
+                   for m in ("<|memory_write|>", "<|memory_read|>", "<|tool_call|>"))]
+    ep = a.out.replace(".jsonl", "_emit.jsonl")
+    with open(ep, "w", encoding="utf-8") as f:
+        for turns in emit:
+            f.write(json.dumps({"turns": turns}, ensure_ascii=False) + "\n")
+    n_tool = sum(1 for t in emit if any("<|tool_call|>" in x.get("content", "")
+                 for x in t if x.get("role") == "assistant"))
+    n_mw = sum(1 for t in emit if any("<|memory_write|>" in x.get("content", "")
+               for x in t if x.get("role") == "assistant"))
+    n_mr = sum(1 for t in emit if any("<|memory_read|>" in x.get("content", "")
+               for x in t if x.get("role") == "assistant"))
+    print(f"\nwrote {ep}: {len(emit):,} token-emitting conversations")
+    print(f"  tool_call {n_tool:,}   memory_write {n_mw:,}   memory_read {n_mr:,}")
+
     tok = sum(len(t.get("content", "")) for c in out for t in c) // 4
     print(f"\nwrote {a.out}: {len(out):,} conversations (~{tok:,} tok)")
     for k in sorted(counts):
