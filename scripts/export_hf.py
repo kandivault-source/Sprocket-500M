@@ -176,7 +176,42 @@ def main():
             got = tok.convert_tokens_to_ids(s)
             if got != tid:
                 sys.exit(f"  SPECIAL TOKEN ID MISMATCH: {s!r} is id {got}, expected {tid}")
+
+        # THE CHAT TEMPLATE. Without this the model is effectively broken for
+        # every downstream user: transformers' apply_chat_template has nothing
+        # to apply, and llama.cpp/Ollama/LM Studio fall back to sending the raw
+        # user string. The model then sees a bare document instead of
+        # <|user|>...<|end|><|assistant|> and behaves like a base completion
+        # model - "hello!" came back as Python source. It looks like a ruined
+        # model when it is only a missing 10-line string.
+        #
+        # Must mirror ChatTemplate.render() in src/train/sft_data.py EXACTLY;
+        # if they drift, inference sees a different format than training did.
+        tok.chat_template = (
+            "{% for m in messages %}"
+            "{% if m['role'] == 'system' %}<|system|>{{ m['content'] }}<|end|>"
+            "{% elif m['role'] == 'user' %}<|user|>{{ m['content'] }}<|end|>"
+            "{% elif m['role'] == 'assistant' %}<|assistant|>{{ m['content'] }}<|end|>"
+            "{% elif m['role'] == 'memory' %}<|memory_read|>{{ m['content'] }}<|end|>"
+            "{% elif m['role'] == 'tool' %}<|tool_result|>{{ m['content'] }}<|end|>"
+            "{% endif %}{% endfor %}"
+            "{% if add_generation_prompt %}<|assistant|>{% endif %}"
+        )
         tok.save_pretrained(a.outdir)
+
+        # Prove the template renders byte-identically to what SFT trained on.
+        # A template that merely EXISTS is not the same as a correct one.
+        sys.path.insert(0, "src")
+        from train.sft_data import ChatTemplate
+        _ct = ChatTemplate(TOKENIZER_JSON)
+        _msgs = [{"role": "user", "content": "hi"}]
+        _want = _ct.tok.decode(_ct.render_prompt(_msgs), skip_special_tokens=False)
+        _got = tok.apply_chat_template(_msgs, tokenize=False,
+                                       add_generation_prompt=True)
+        if _got != _want:
+            sys.exit(f"  CHAT TEMPLATE MISMATCH\n   template: {_got!r}\n"
+                     f"   training: {_want!r}")
+        print(f"  chat template verified identical to training format: {_got!r}")
         rt = tok("Oi. Sprocket. What're we buildin'?")["input_ids"]
         print(f"  tokenizer: vocab={len(tok)} (matches model), all {len(SPECIALS)} "
               f"special ids verified")
