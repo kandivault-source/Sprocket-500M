@@ -339,6 +339,40 @@ if [ "${GGUF:-1}" = "1" ]; then
     cd "$WORK"
     [ -d llama.cpp ] || git clone --depth 1 https://github.com/ggml-org/llama.cpp
     cd llama.cpp
+
+    # llama.cpp identifies a BPE pre-tokenizer by SHA-256 of its config and
+    # matches that against a hardcoded list. Our 32k tokenizer is not on it, so
+    # conversion dies with "BPE pre-tokenizer was not recognized" AFTER the
+    # model has already trained and pushed - which is exactly what happened on
+    # the 20B run (twice).
+    #
+    # Ours is a plain ByteLevel BPE: use_regex true, no normalizer, no
+    # byte_fallback. That is GPT-2's scheme, so "gpt-2" is the correct answer
+    # here, not a guess. Register the hash rather than blanket-disabling the
+    # check, so a genuinely unknown tokenizer still fails loudly.
+    python - <<'PY'
+import glob, re, sys
+HASH = "50cc433d4d528ad898dc1178e17a479f50c03d2c883d07494ae21da32d3eed4f"
+targets = [p for p in glob.glob("**/*.py", recursive=True)
+           if "get_vocab_base_pre" in open(p, encoding="utf-8", errors="ignore").read()]
+if not targets:
+    print("  ! could not find get_vocab_base_pre; leaving llama.cpp untouched")
+    sys.exit(0)
+for p in targets:
+    src = open(p, encoding="utf-8").read()
+    if HASH in src:
+        print(f"  {p}: already registered")
+        continue
+    m = re.search(r"^([ \t]+)res = None[ \t]*$", src, re.M)
+    if not m:
+        print(f"  ! {p}: no 'res = None' anchor; skipped")
+        continue
+    ind = m.group(1)
+    ins = (f'{m.group(0)}\n{ind}if chkhsh == "{HASH}":\n'
+           f'{ind}    res = "gpt-2"  # Sprocket 32k ByteLevel BPE')
+    open(p, "w", encoding="utf-8").write(src.replace(m.group(0), ins, 1))
+    print(f"  {p}: registered Sprocket tokenizer hash -> gpt-2")
+PY
     pip install -q -r requirements/requirements-convert_hf_to_gguf.txt 2>/dev/null \
       || pip install -q sentencepiece protobuf 2>/dev/null || true
     python convert_hf_to_gguf.py "$WORK/hf-${PRESET}" \
