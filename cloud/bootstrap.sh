@@ -302,9 +302,32 @@ fi
 BASE="checkpoints/${PRESET}_final.pt"
 [ -f "$BASE" ] || BASE="checkpoints/${PRESET}_latest.pt"
 log "SFT from $BASE"
+# UPWEIGHT oversamples the capability conversations (tool / memory / safety) by
+# listing that file N times - load_conversations() concatenates every path it is
+# given, so a repeated path is a repeated corpus.
+#
+# The first real fit emitted ZERO tool calls and ZERO memory writes. Tool data
+# was 4.4% of the corpus over 3 epochs, i.e. ~2,800 gradient exposures of a
+# brand-new control token - not enough for a 501M model to lock onto a fixed
+# output format. sprocket_caps.jsonl carries the NEGATIVES too (tools offered
+# but not needed, memory-present-stay-silent, over-refusal), so raising the
+# weight cannot bias it toward always calling a tool or always refusing.
+SFT_DATA="data/synthetic/sprocket_sft.jsonl data/synthetic/sprocket_instruct.jsonl"
+CAPS="data/synthetic/sprocket_caps.jsonl"
+UPWEIGHT="${UPWEIGHT:-1}"
+if [ -f "$CAPS" ] && [ "$UPWEIGHT" -gt 1 ]; then
+  i=1
+  while [ "$i" -lt "$UPWEIGHT" ]; do
+    SFT_DATA="$SFT_DATA $CAPS"
+    i=$((i + 1))
+  done
+  log "SFT upweight: capability conversations x${UPWEIGHT}"
+fi
+
 python -m src.train.sft \
   --base "$BASE" --preset "$PRESET" --ctx "$CTX" \
-  --micro-batch 16 --grad-accum 2 --epochs 3 \
+  --data $SFT_DATA \
+  --micro-batch 16 --grad-accum 2 --epochs "${EPOCHS:-3}" \
   --ckpt-minutes 10 --resume auto $COMPILE_FLAG
 
 # ---------------------------------------------------------------- 5. export
