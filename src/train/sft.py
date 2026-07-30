@@ -37,6 +37,8 @@ def parse_args():
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--base", default=None, help="pretrained checkpoint to start from")
+    p.add_argument("--from-scratch", action="store_true",
+                   help="allow fine-tuning from random init (smoke tests only)")
     p.add_argument("--preset", default="proto-75m", choices=sorted(PRESETS))
     p.add_argument("--data", nargs="*", default=["data/synthetic/sprocket_sft.jsonl",
                                                  "data/synthetic/sprocket_instruct.jsonl"])
@@ -144,8 +146,31 @@ raw_model = model          # state_dict/generate must go through the uncompiled 
 n_params = model.num_params()
 print(f"model {A.preset}: {n_params/1e6:.1f}M params", flush=True)
 
+def resolve(spec):
+    if spec is None:
+        return None
+    if spec != "auto":
+        return spec
+    return LATEST if os.path.exists(LATEST) else None
+
+
 start_it, history = 0, []
-if A.base and not A.resume:
+
+# PRECEDENCE, and it has to be resolved BEFORE deciding what to load:
+#   1. a resumable SFT checkpoint wins  - we are continuing an interrupted fit
+#   2. else --base seeds the weights    - a fresh fit on top of the pretrain
+#   3. else random init                 - only ever legitimate for a smoke test
+#
+# This used to read `if A.base and not A.resume`, which silently discarded the
+# base whenever --resume auto was also passed. bootstrap.sh passes BOTH on every
+# run, so with no SFT checkpoint to resume (e.g. right after SFT_FRESH archived
+# them) neither branch fired and the model trained FROM RANDOM INIT - and the
+# "no --base" warning was gated the same way, so nothing said so. It cost a
+# full SFT run whose only symptom was a step-0 loss of 10.65 (= ln 32000) and
+# a gibberish sample. Never let this be inferable only from the loss value.
+rp = resolve(A.resume)
+
+if not rp and A.base:
     ck = torch.load(A.base, map_location=device, weights_only=False)
     saved = ck.get("cfg", {})
     for k in ("dim", "n_layers", "n_heads", "n_kv_heads", "vocab_size"):
@@ -154,9 +179,16 @@ if A.base and not A.resume:
     raw_model.load_state_dict(ck["model"])
     print(f"loaded BASE weights from {A.base} (iter {ck.get('it')}) — fresh optimizer",
           flush=True)
-elif not A.base and not A.resume:
-    print("! no --base: fine-tuning from RANDOM init. Fine for a smoke test, "
-          "useless for a real model.", flush=True)
+elif not rp and not A.base:
+    if not A.from_scratch:
+        sys.exit(
+            "REFUSING to fine-tune from random init.\n"
+            "  No resumable checkpoint and no --base. The result would be a "
+            "500M model trained on a few million tokens: fluent-looking "
+            "gibberish that still exports and pushes cleanly.\n"
+            "  Pass --base <pretrain ckpt>, or --from-scratch if you really "
+            "mean it.")
+    print("! --from-scratch: fine-tuning from RANDOM init.", flush=True)
 
 opt = model.configure_optimizers(A.weight_decay, A.peak_lr, device_type="cuda")
 
@@ -169,15 +201,6 @@ def lr_at(it):
 
 
 # ------------------------------------------------------------------ resume
-def resolve(spec):
-    if spec is None:
-        return None
-    if spec != "auto":
-        return spec
-    return LATEST if os.path.exists(LATEST) else None
-
-
-rp = resolve(A.resume)
 if rp:
     ck = torch.load(rp, map_location=device, weights_only=False)
     raw_model.load_state_dict(ck["model"])
