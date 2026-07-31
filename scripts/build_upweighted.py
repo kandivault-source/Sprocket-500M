@@ -162,6 +162,37 @@ def main():
     print(f"\nwrote {ep}: {len(emit):,} token-emitting conversations")
     print(f"  tool_call {n_tool:,}   memory_write {n_mw:,}   memory_read {n_mr:,}")
 
+    # ---- the manifest GATE -------------------------------------------------
+    # MEASURED: P(<|tool_call|> as the first generated token) on "hello?" was
+    # 0.413 - 19% of plain greetings derailed into a tool call under normal
+    # sampling. Greedy decoding hides this completely.
+    #
+    # Cause: EVERY tool example in the corpus carries a manifest in the system
+    # turn, including the no-call negatives. So the model never saw evidence
+    # that "no manifest" means "never emit <|tool_call|>". It learned
+    # question-shaped-input -> tool call, and upweighting amplified that.
+    #
+    # Fix, free and needing no new generation: take the examples that already
+    # answer WITHOUT calling a tool and strip their manifest. That is exactly
+    # the missing case - tool-shaped question, no tools offered, answer plainly.
+    gate = []
+    for turns in out:
+        asst = " ".join(t.get("content", "") for t in turns
+                        if t.get("role") == "assistant")
+        if "<|tool_call|>" in asst or any(t.get("role") == "tool" for t in turns):
+            continue                      # only the no-call ones
+        sysm = [t for t in turns if t.get("role") == "system"]
+        if not (sysm and '"name":' in (sysm[0].get("content") or "")):
+            continue                      # only ones that HAVE a manifest
+        gate.append([t for t in turns if t.get("role") != "system"])
+
+    gp = a.out.replace(".jsonl", "_gate.jsonl")
+    with open(gp, "w", encoding="utf-8") as f:
+        for turns in gate:
+            f.write(json.dumps({"turns": turns}, ensure_ascii=False) + "\n")
+    print(f"\nwrote {gp}: {len(gate):,} manifest-stripped no-call conversations")
+    print("  teaches: tool-shaped question + NO manifest -> answer directly")
+
     tok = sum(len(t.get("content", "")) for c in out for t in c) // 4
     print(f"\nwrote {a.out}: {len(out):,} conversations (~{tok:,} tok)")
     for k in sorted(counts):

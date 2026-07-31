@@ -329,6 +329,20 @@ fi
 # exposure count (590 tool-emitting convos vs 237 memory_write). This lifts the
 # emitters without disturbing the restraint balance - every negative example
 # stays at its base weight in the main caps file.
+# GATE_UPWEIGHT: manifest-stripped no-call examples. Without these the corpus
+# contains no evidence that "no manifest" means "never emit <|tool_call|>", and
+# a bare "hello?" fires a tool call 41% of the time.
+CAPS_GATE="data/synthetic/sprocket_caps_gate.jsonl"
+GATE_UPWEIGHT="${GATE_UPWEIGHT:-0}"
+if [ -f "$CAPS_GATE" ] && [ "$GATE_UPWEIGHT" -gt 0 ]; then
+  i=0
+  while [ "$i" -lt "$GATE_UPWEIGHT" ]; do
+    SFT_DATA="$SFT_DATA $CAPS_GATE"
+    i=$((i + 1))
+  done
+  log "SFT upweight: manifest-gate conversations x${GATE_UPWEIGHT}"
+fi
+
 CAPS_EMIT="data/synthetic/sprocket_caps_emit.jsonl"
 EMIT_UPWEIGHT="${EMIT_UPWEIGHT:-0}"
 if [ -f "$CAPS_EMIT" ] && [ "$EMIT_UPWEIGHT" -gt 0 ]; then
