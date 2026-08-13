@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sprocket 500M: how the model reads text</title>
+<meta name="description" content="An interactive look at the tokenizer and vocabulary behind Sprocket 500M, a language model trained from scratch.">
+<style>
+  *,*::before,*::after { box-sizing: border-box; }
+  :root {
+    color-scheme: light;
+    --bg:#fcfcfb; --panel:#f4f4f2; --border:#e2e1dd;
+    --fg:#0b0b0b; --fg2:#52514e; --fg3:#84837d;
+    --blue:#2a78d6; --orange:#eb6834; --green:#1baf7a;
+    --tok-a:rgba(42,120,214,.14); --tok-b:rgba(235,104,52,.14);
+    --tok-a-br:rgba(42,120,214,.45); --tok-b-br:rgba(235,104,52,.45);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg:#1a1a19; --panel:#242423; --border:#3a3a37;
+      --fg:#ffffff; --fg2:#c3c2b7; --fg3:#8f8e86;
+      --blue:#5b9df0; --orange:#f07a4a; --green:#2fc48d;
+      --tok-a:rgba(91,157,240,.18); --tok-b:rgba(240,122,74,.18);
+      --tok-a-br:rgba(91,157,240,.5); --tok-b-br:rgba(240,122,74,.5);
+    }
+  }
+  body {
+    margin:0; background:var(--bg); color:var(--fg);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height:1.6; -webkit-font-smoothing:antialiased;
+  }
+  .wrap { max-width: 860px; margin:0 auto; padding: 48px 20px 80px; }
+  header { border-bottom:1px solid var(--border); padding-bottom:28px; margin-bottom:40px; }
+  h1 { font-size: clamp(1.7rem, 4vw, 2.3rem); margin:0 0 10px; letter-spacing:-.025em; line-height:1.2; }
+  h2 { font-size:1.28rem; margin:52px 0 12px; letter-spacing:-.015em; }
+  h3 { font-size:1rem; margin:28px 0 8px; }
+  p { margin: 0 0 16px; }
+  .sub { color:var(--fg2); font-size:1.02rem; margin:0; }
+  a { color:var(--blue); }
+  code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  code { background:var(--panel); padding:.12em .38em; border-radius:4px; font-size:.9em; }
+  .panel { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:20px; }
+  .muted { color:var(--fg2); font-size:.93rem; }
+  .tiny { color:var(--fg3); font-size:.83rem; }
+
+  textarea {
+    width:100%; min-height:104px; resize:vertical; padding:13px 14px;
+    background:var(--bg); color:var(--fg);
+    border:1px solid var(--border); border-radius:9px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size:.94rem; line-height:1.55;
+  }
+  textarea:focus, input:focus { outline:2px solid var(--blue); outline-offset:1px; }
+
+  .stats { display:flex; flex-wrap:wrap; gap:10px; margin:16px 0 4px; }
+  .stat { background:var(--bg); border:1px solid var(--border); border-radius:9px; padding:9px 14px; flex:1 1 116px; }
+  .stat .k { font-size:.68rem; text-transform:uppercase; letter-spacing:.07em; color:var(--fg3); }
+  .stat .v { font-size:1.32rem; font-weight:650; font-variant-numeric:tabular-nums; letter-spacing:-.02em; }
+
+  #tokens { margin-top:18px; display:flex; flex-wrap:wrap; gap:3px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:.93rem; }
+  .tok {
+    padding:3px 1px; border-radius:4px; border:1px solid transparent;
+    white-space:pre; cursor:default; position:relative;
+  }
+  .tok.a { background:var(--tok-a); border-color:var(--tok-a-br); }
+  .tok.b { background:var(--tok-b); border-color:var(--tok-b-br); }
+  .tok.sp { background:transparent; border-color:var(--green); color:var(--green); font-weight:600; }
+  .tok .id {
+    position:absolute; left:50%; transform:translateX(-50%); bottom:-15px;
+    font-size:.6rem; color:var(--fg3); opacity:0; transition:opacity .1s; pointer-events:none;
+  }
+  #tokens.ids { margin-bottom:20px; }
+  #tokens.ids .tok .id { opacity:1; }
+  #tokens.ids .tok { margin-bottom:14px; }
+  .dot { color:var(--fg3); opacity:.55; }
+
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:14px; }
+  button, .chip {
+    font:inherit; font-size:.86rem; padding:6px 12px; border-radius:7px; cursor:pointer;
+    background:var(--bg); color:var(--fg2); border:1px solid var(--border);
+  }
+  button:hover, .chip:hover { border-color:var(--blue); color:var(--blue); }
+  label.toggle { display:inline-flex; align-items:center; gap:7px; font-size:.86rem; color:var(--fg2); cursor:pointer; }
+
+  input[type=search] {
+    width:100%; padding:10px 13px; background:var(--bg); color:var(--fg);
+    border:1px solid var(--border); border-radius:9px; font:inherit; font-size:.93rem;
+  }
+  .vgrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(148px,1fr)); gap:6px; margin-top:14px; max-height:330px; overflow-y:auto; padding-right:4px; }
+  .vitem { display:flex; justify-content:space-between; gap:8px; background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:5px 9px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:.82rem; }
+  .vitem .t { overflow:hidden; text-overflow:ellipsis; white-space:pre; }
+  .vitem .i { color:var(--fg3); font-variant-numeric:tabular-nums; flex:none; }
+
+  table { border-collapse:collapse; width:100%; font-size:.9rem; margin-top:10px; }
+  th,td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--border); vertical-align:top; }
+  th { color:var(--fg2); font-weight:600; font-size:.8rem; text-transform:uppercase; letter-spacing:.05em; }
+  td.mono { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; white-space:nowrap; }
+  .wrapx { overflow-x:auto; }
+  footer { margin-top:64px; padding-top:22px; border-top:1px solid var(--border); color:var(--fg3); font-size:.87rem; }
+  .loading { color:var(--fg3); font-size:.9rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>How Sprocket reads text</h1>
+  <p class="sub">
+    Sprocket is a 501M-parameter language model trained from scratch. Before it can
+    learn anything from a sentence, the sentence has to be turned into numbers. This
+    page shows the piece that does that, running live in your browser on the real
+    vocabulary the model was trained with.
+  </p>
+</header>
+
+<h2>A model never sees letters</h2>
+
+<p>
+  A language model works with a fixed list of numbered pieces of text. Every input
+  has to be cut into pieces from that list, and each piece gets swapped for its
+  number. The model only ever sees the numbers.
+</p>
+
+<p>
+  The list is called the <strong>vocabulary</strong>, and the thing that does the
+  cutting is the <strong>tokenizer</strong>. Sprocket's vocabulary has
+  <strong>32,000</strong> entries. They are not words. Common words are usually a
+  single entry, but rarer words get split into fragments, and a word the vocabulary
+  has never seen still works because it can always fall back to smaller pieces.
+</p>
+
+<p>
+  This matters more than it sounds. The vocabulary is fixed before training starts
+  and can never change afterwards, because every number the model learned would
+  point at something different. It also sets the price of everything: a tokenizer
+  that needs more pieces to write the same sentence means more compute per page of
+  text, a shorter effective memory, and a larger bill.
+</p>
+
+<h2>Try it</h2>
+
+<div class="panel">
+  <textarea id="input" spellcheck="false" aria-label="Text to tokenize">The goblin tinkered with the machine until it finally worked.</textarea>
+
+  <div class="row">
+    <button data-sample="The goblin tinkered with the machine until it finally worked.">A sentence</button>
+    <button data-sample="antidisestablishmentarianism">A rare word</button>
+    <button data-sample="12,847 + 936 = 13,783">Numbers</button>
+    <button data-sample="&lt;|user|&gt;what are you?&lt;|end|&gt;&lt;|assistant|&gt;">Chat format</button>
+    <button data-sample="def tokenize(text): return [vocab[t] for t in split(text)]">Code</button>
+    <label class="toggle"><input type="checkbox" id="showids"> show ID numbers</label>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="k">characters</div><div class="v" id="s-chars">0</div></div>
+    <div class="stat"><div class="k">tokens</div><div class="v" id="s-tokens">0</div></div>
+    <div class="stat"><div class="k">chars / token</div><div class="v" id="s-ratio">0</div></div>
+  </div>
+
+  <div id="tokens"><span class="loading">Loading the vocabulary…</span></div>
+  <p class="tiny" id="hint" style="margin-top:18px">
+    Alternating colours mark where one token ends and the next begins.
+    <span class="dot">·</span> stands for a space that belongs to the token after it.
+  </p>
+</div>
+
+<h2>Where these 32,000 pieces came from</h2>
+
+<p>
+  Nobody chose them. The vocabulary was <em>learned</em> from text, using an
+  approach called byte pair encoding, and the idea behind it is simple enough to
+  describe in a sentence: start with the smallest possible pieces, then repeatedly
+  glue together whichever pair shows up next to each other most often.
+</p>
+
+<p>
+  It starts with raw bytes, so the beginning vocabulary is just 256 entries and
+  every possible input is already representable. Then it counts pairs across a
+  large sample of text. If <code>t</code> and <code>h</code> are the most common
+  adjacent pair, <code>th</code> becomes entry 257. Now it counts again, with
+  <code>th</code> treated as a single unit, and maybe <code>th</code> and
+  <code>e</code> merge into <code>the</code>. Repeat until the vocabulary is the
+  size you asked for.
+</p>
+
+<p>
+  Sprocket's ran for <strong>31,728 merges</strong> over a sample of FineWeb-Edu,
+  the same source used for the main training. The order of those merges is kept,
+  and encoding just replays them: the tokenizer above is applying that exact list
+  to whatever you type, lowest-numbered merge first.
+</p>
+
+<p>
+  Because the merges were learned from ordinary English web text, that is what the
+  vocabulary is efficient at. It averages about <strong>4.5 characters per
+  token</strong> on that kind of writing. Feed it something unlike its training
+  text and the number drops, which is exactly what you see if you paste code or an
+  unusual word into the box above. Nothing breaks. It just takes more pieces, and
+  more pieces cost more.
+</p>
+
+<h3>Starting from bytes, not characters</h3>
+
+<p>
+  Working at the byte level is what makes the "nothing breaks" part true. There are
+  far more possible characters in the world than any 32,000-entry list can hold, so
+  a tokenizer built from characters has to decide what to do with the ones it does
+  not know, and the usual answer is a placeholder that destroys the text. Bytes
+  have no such problem: there are only 256 of them, all of them are in the
+  vocabulary from the start, and anything at all can be spelled out.
+</p>
+
+<h2>Browse the real vocabulary</h2>
+
+<div class="panel">
+  <input type="search" id="vsearch" placeholder="Search the vocabulary, or type an ID number" aria-label="Search vocabulary">
+  <div class="vgrid" id="vgrid"></div>
+  <p class="tiny" id="vcount" style="margin:12px 0 0"></p>
+</div>
+
+<h2>The 16 reserved entries</h2>
+
+<p>
+  Not every entry was learned. Sixteen were set aside by hand before training, and
+  they are the only ones that mean something structural rather than textual. They
+  are how the model can tell who is speaking, where a turn ends, and when it is
+  doing something other than replying.
+</p>
+
+<div class="wrapx">
+<table>
+  <thead><tr><th>ID</th><th>Token</th><th>What it marks</th></tr></thead>
+  <tbody id="specials"></tbody>
+</table>
+</div>
+
+<p class="muted" style="margin-top:16px">
+  Reserving these is a decision made once and permanently. They occupy IDs 0 to 15,
+  which is why the learned vocabulary starts at 16. Adding a new one after training
+  would mean a piece the model has never seen, so the full set has to be planned
+  before the first token is ever encoded.
+</p>
+
+<footer>
+  <p>
+    Part of <a href="https://github.com/kandivault-source/Sprocket-500M">Sprocket 500M</a>.
+    The model is on <a href="https://huggingface.co/kandivault/sprocket-500m">Hugging Face</a>.
+  </p>
+  <p class="tiny">
+    Everything on this page runs in your browser. The tokenizer is a JavaScript
+    reimplementation of the model's real one, checked against it for agreement.
+  </p>
+</footer>
+
+</div>
+
+<script src="tokenizer.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  var TK = null;
+  var fromByteString = SprocketTokenizer.fromByteString;
+  var toByteString = SprocketTokenizer.toByteString;
+  var IDS = null, SPECIALS = null;
+
+  function encode(text) { return TK ? TK.encode(text) : []; }
+
+  // ---- rendering ----------------------------------------------------------
+  var $ = function (id) { return document.getElementById(id); };
+  var input = $("input"), box = $("tokens");
+
+  function render() {
+    var text = input.value;
+    var toks = encode(text);
+    $("s-chars").textContent = text.length.toLocaleString();
+    $("s-tokens").textContent = toks.length.toLocaleString();
+    $("s-ratio").textContent = toks.length ? (text.length / toks.length).toFixed(2) : "0";
+
+    box.textContent = "";
+    var frag = document.createDocumentFragment();
+    for (var i = 0; i < toks.length; i++) {
+      var tk = toks[i];
+      var el = document.createElement("span");
+      el.className = "tok " + (tk.special ? "sp" : (i % 2 ? "b" : "a"));
+      var shown = tk.special ? tk.t : fromByteString(tk.t);
+      // A leading space is part of the token; show it rather than let it vanish.
+      if (!tk.special && shown.charAt(0) === " ") {
+        var d = document.createElement("span");
+        d.className = "dot"; d.textContent = "·";
+        el.appendChild(d);
+        shown = shown.slice(1);
+      }
+      el.appendChild(document.createTextNode(shown.replace(/\n/g, "\\n")));
+      var idEl = document.createElement("span");
+      idEl.className = "id";
+      idEl.textContent = tk.id;
+      el.appendChild(idEl);
+      el.title = "id " + tk.id + (tk.special ? " (reserved)" : "");
+      frag.appendChild(el);
+    }
+    box.appendChild(frag);
+  }
+
+  function renderVocab(q) {
+    var grid = $("vgrid");
+    grid.textContent = "";
+    q = (q || "").trim();
+    var hits = [], i;
+    if (/^\d+$/.test(q)) {
+      var n = parseInt(q, 10);
+      if (n >= 0 && n < IDS.length) hits.push(n);
+    } else {
+      var needle = q ? toByteString(q) : "";
+      for (i = 0; i < IDS.length && hits.length < 400; i++) {
+        if (!needle || IDS[i].indexOf(needle) !== -1) hits.push(i);
+      }
+    }
+    var frag = document.createDocumentFragment();
+    for (i = 0; i < hits.length; i++) {
+      var id = hits[i];
+      var row = document.createElement("div");
+      row.className = "vitem";
+      var t = document.createElement("span");
+      t.className = "t";
+      var s = SPECIALS_BY_ID[id] !== undefined ? IDS[id] : fromByteString(IDS[id]);
+      t.textContent = s.replace(/^ /, "·").replace(/\n/g, "\\n");
+      var n2 = document.createElement("span");
+      n2.className = "i";
+      n2.textContent = id;
+      row.appendChild(t); row.appendChild(n2);
+      frag.appendChild(row);
+    }
+    grid.appendChild(frag);
+    if (!hits.length) {
+      $("vcount").textContent = "no matches";
+    } else if (!q) {
+      $("vcount").textContent = "showing the first " + hits.length.toLocaleString() +
+        " of 32,000. Search to find a specific one.";
+    } else if (hits.length >= 400) {
+      $("vcount").textContent = "showing the first 400 matches";
+    } else {
+      $("vcount").textContent = hits.length.toLocaleString() +
+        (hits.length === 1 ? " match" : " matches");
+    }
+  }
+
+  var SPECIALS_BY_ID = {};
+
+  function describe(tok) {
+    var map = {
+      "<|endoftext|>": "The boundary between two unrelated documents in training",
+      "<|pad|>": "Filler, so a batch of different-length examples lines up",
+      "<|system|>": "Start of an instruction about how to behave",
+      "<|user|>": "Start of something a person said",
+      "<|assistant|>": "Start of the model's own reply",
+      "<|end|>": "End of the current turn",
+      "<|tool_call|>": "The model is asking to use a tool instead of answering",
+      "<|tool_result|>": "What the tool sent back",
+      "<think>": "Start of private reasoning, not meant as the answer",
+      "</think>": "End of private reasoning",
+      "<|memory_read|>": "The model is recalling a stored fact",
+      "<|memory_write|>": "The model is asking to store a fact"
+    };
+    return map[tok] || "Reserved for future use";
+  }
+
+  fetch("tokenizer-data.json")
+    .then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    })
+    .then(function (d) {
+      TK = new SprocketTokenizer.Tokenizer(d);
+      IDS = d.tokens;
+      SPECIALS = d.specials;
+
+      var i;
+      var keys = Object.keys(SPECIALS).sort(function (a, b) { return SPECIALS[a] - SPECIALS[b]; });
+      for (i = 0; i < keys.length; i++) SPECIALS_BY_ID[SPECIALS[keys[i]]] = keys[i];
+
+      var tb = $("specials");
+      for (i = 0; i < keys.length; i++) {
+        var tr = document.createElement("tr");
+        var a = document.createElement("td"); a.className = "mono"; a.textContent = SPECIALS[keys[i]];
+        var b = document.createElement("td"); b.className = "mono"; b.textContent = keys[i];
+        var c = document.createElement("td"); c.textContent = describe(keys[i]);
+        tr.appendChild(a); tr.appendChild(b); tr.appendChild(c);
+        tb.appendChild(tr);
+      }
+
+      render();
+      renderVocab("");
+    })
+    .catch(function (e) {
+      box.innerHTML = '<span class="loading">Could not load the vocabulary (' +
+        String(e.message || e) + '). This page needs to be served over http, not opened as a file.</span>';
+    });
+
+  input.addEventListener("input", render);
+  $("showids").addEventListener("change", function () {
+    box.classList.toggle("ids", this.checked);
+  });
+  $("vsearch").addEventListener("input", function () { renderVocab(this.value); });
+  var btns = document.querySelectorAll("button[data-sample]");
+  for (var i = 0; i < btns.length; i++) {
+    btns[i].addEventListener("click", function () {
+      input.value = this.getAttribute("data-sample");
+      render();
+    });
+  }
+})();
+</script>
+</body>
+</html>
