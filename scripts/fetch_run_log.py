@@ -19,7 +19,7 @@ import re
 import sys
 import urllib.request
 
-REPO = os.environ.get("HF_REPO", "HuggingFace7141/sprocket-500m")
+REPO = os.environ.get("HF_REPO", "kandivault/sprocket-500m")
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
 

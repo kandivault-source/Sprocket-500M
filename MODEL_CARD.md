@@ -1,3 +1,19 @@
+---
+license: apache-2.0
+language:
+  - en
+library_name: transformers
+pipeline_tag: text-generation
+datasets:
+  - HuggingFaceFW/fineweb-edu
+  - LibrAI/do-not-answer
+tags:
+  - llama
+  - gguf
+  - from-scratch
+  - small-language-model
+---
+
 # Sprocket 500M
 
 A 501M-parameter language model trained from scratch on a single GPU, with a
@@ -147,8 +163,8 @@ is the tradeoff that produced the chat build.
 
 ```python
 from transformers import AutoModelForCausalLM, AutoTokenizer
-m = AutoModelForCausalLM.from_pretrained("HuggingFace7141/sprocket-500m")
-t = AutoTokenizer.from_pretrained("HuggingFace7141/sprocket-500m")
+m = AutoModelForCausalLM.from_pretrained("kandivault/sprocket-500m")
+t = AutoTokenizer.from_pretrained("kandivault/sprocket-500m")
 ```
 
 ### Chat format

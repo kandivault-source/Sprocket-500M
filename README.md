@@ -6,7 +6,7 @@ orchestration that ran it unattended. Pretrained on 20.0B tokens across 54.3
 hours on one rented H100, for about $165 in GPU time.
 
 Weights, GGUF builds and a full behavioural writeup are published at
-[HuggingFace7141/sprocket-500m](https://huggingface.co/HuggingFace7141/sprocket-500m).
+[kandivault/sprocket-500m](https://huggingface.co/kandivault/sprocket-500m).
 The model card there is the honest account of what the model can and cannot do.
 This README is about how it was built.
 
