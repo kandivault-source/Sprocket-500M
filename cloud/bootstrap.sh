@@ -219,7 +219,12 @@ def _sft():
 chk("SFT chat template renders", _sft)
 
 def _corpus():
-    assert os.path.exists("data/synthetic/sprocket_sft.jsonl"), "SFT corpus missing from repo"
+    # The SFT corpus is generated, not stored in this repo. Fail here with a
+    # pointer rather than 20 GPU-hours later at the SFT stage.
+    assert os.path.exists("data/synthetic/sprocket_sft.jsonl"), (
+        "SFT corpus missing. It is generated, not distributed with this repo - "
+        "build it with scripts/harvest_round.py + scripts/consolidate_instruct.py "
+        "and commit it before launching. See the README.")
     n = sum(1 for _ in open("data/synthetic/sprocket_sft.jsonl", encoding="utf-8"))
     assert n > 10000, f"only {n} SFT rows"
     print(f"         {n:,} SFT conversations present")

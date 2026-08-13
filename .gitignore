@@ -1,6 +1,14 @@
-# ---------------------------------------------------------------- MUST be pushed
-# data/synthetic/*.jsonl  (~37 MB) is the SFT corpus. The cloud pod clones this
-# repo to get it — it is NOT regenerable on the box. Do not add it here.
+# ---------------------------------------------------------------- not distributed
+# The synthetic SFT corpus. Generated with Claude, and deliberately not
+# redistributed from this repository. The generation pipeline is here
+# (workflows/, scripts/harvest_round.py, scripts/consolidate_instruct.py); its
+# output is not.
+#
+# NOTE: cloud/bootstrap.sh clones this repo on the pod to find the corpus at
+# data/synthetic/sprocket_sft.jsonl. To run the SFT stage you must generate it
+# and commit it to your own fork first. Preflight fails with a pointer if it is
+# missing, rather than 20 GPU-hours later at the SFT stage.
+data/synthetic/
 
 # ---------------------------------------------------------------- never push
 # Tokenized corpora: 350 MB locally, 40-200 GB after a real build. The pod
@@ -35,6 +43,10 @@ eval/persona_results.json
 scratch_ckpt*/
 _shards/
 *.log
+
+# Working notes, not part of the published project
+NEXT_SESSION_PROMPT.md
+notes/
 
 # ---------------------------------------------------------------- secrets
 # HF_TOKEN / RUNPOD_API_KEY belong in pod env vars, never in the repo.

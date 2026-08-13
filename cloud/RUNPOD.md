@@ -1,12 +1,12 @@
 # Sprocket on RunPod — from one command to a downloadable model
 
-## LIVE CONFIG (provisioned 2026-07-27)
+## The configuration this model was trained on
 
 | Item | Value |
 |---|---|
-| Network volume | **`94biin05n5`** ("sprocket-vol", 50 GB, **US-NE-1**) |
-| GPU for both smoke + real run | **H100 SXM 80GB @ $2.69/hr** |
-| Repo | `github.com/kandivault-source/Sprocket-500M` (private) |
+| Network volume | 250 GB, **US-NE-1** |
+| GPU for both smoke + real run | **H100 SXM 80GB** |
+| Datacenter | US-NE-1 (load-bearing, see below) |
 
 **Why US-NE-1:** H100 SXM is only bookable in 9 datacenters and only 5 of those
 support network volumes (AP-JP-1, EU-FR-1, EUR-IS-3, EUR-NO-2, US-NE-1). US-NE-1
@@ -39,9 +39,11 @@ from the network volume. That is the design, not a fallback.
 
 ## One-time setup (about 10 minutes)
 
-**1. Push this repo to GitHub.** The pod clones it. Include `data/synthetic/*.jsonl`
-(~37 MB — that's the SFT corpus). Do **not** include `data/processed/*.bin`; the pod
-rebuilds those.
+**1. Push this repo to GitHub.** The pod clones it, and it must be able to find the
+SFT corpus at `data/synthetic/*.jsonl`. That corpus is not distributed here (see
+"Reproducing the SFT stage" in the README) — generate it first, and confirm it is
+committed before launching. Do **not** commit `data/processed/*.bin`; the pod
+rebuilds those from FineWeb-Edu.
 
 **2. Install and authenticate the CLI.**
 ```bash

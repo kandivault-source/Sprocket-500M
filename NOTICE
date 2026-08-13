@@ -1,0 +1,57 @@
+Sprocket 500M
+Copyright 2026 KandiVault LLC
+
+This product includes software developed by KandiVault LLC, licensed under the
+Apache License, Version 2.0. See LICENSE.
+
+
+THIRD-PARTY DATA
+================
+
+FineWeb-Edu
+  https://huggingface.co/datasets/HuggingFaceFW/fineweb-edu
+  Licensed under the Open Data Commons Attribution License (ODC-By) v1.0.
+  Used as the pretraining corpus (the sample/100BT subset, 20.0B tokens after
+  tokenization). The dataset itself is not redistributed here; scripts/build_corpus.py
+  downloads it at build time.
+
+LibrAI/do-not-answer
+  https://huggingface.co/datasets/LibrAI/do-not-answer
+  Licensed under the Apache License, Version 2.0. Citation: arXiv:2308.13387.
+  939 risk-probing prompts are redistributed in data/safety/dna_prompts.jsonl,
+  with source metadata in data/safety/SOURCE.json. The prompts are theirs. Only
+  the responses generated against them are this project's, and those responses
+  are not redistributed.
+
+
+THIRD-PARTY SOFTWARE
+====================
+
+No third-party source code is vendored into this repository. The following are
+runtime or build-time dependencies, obtained from their own distributions:
+
+llama.cpp (https://github.com/ggml-org/llama.cpp), MIT License.
+  Cloned on the training pod to produce the GGUF exports. cloud/bootstrap.sh
+  patches a local clone at build time to register this project's tokenizer hash
+  in the BPE pre-tokenizer table. That patch is applied to their working copy on
+  the pod and is not redistributed.
+
+PyTorch, Hugging Face transformers, tokenizers and huggingface_hub are declared
+in requirements.txt and are used as libraries under their respective licenses.
+
+
+ARCHITECTURE AND PRIOR ART
+==========================
+
+The model in src/model/model.py is original code. It implements the Llama family
+architecture (RoPE, RMSNorm, SwiGLU, grouped-query attention), which is a
+published design rather than borrowed source. The implementation differs from
+Meta's reference in substance as well as style, including a real-valued
+split-half rotary embedding instead of the reference's complex-number
+formulation.
+
+Two conventions in the training code follow those popularised by Andrej
+Karpathy's nanoGPT (MIT License): splitting AdamW parameter groups by tensor
+rank for weight decay, and scaling residual-projection initialisation by
+1/sqrt(2 * n_layers). These are short, widely reimplemented idioms rather than
+copied code, and are credited here for completeness.
