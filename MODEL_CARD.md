@@ -109,29 +109,41 @@ trained in, but the underlying language model is thin.
 
 ## Files
 
-Everything described on this card is the **instruct** build, exported from
-`500m_sft_final.pt` at step 1192 (see `export_provenance.json`).
+**Two builds ship here.** Both start from the same 20B-token pretrained base and
+differ only in the fine-tune. Pick by what you want it to do.
+
+### Chat build — start here
 
 | File | Use |
 |---|---|
-| `model.safetensors` | HF format, loads as `LlamaForCausalLM`. The instruct build. |
-| `sprocket-500m-q4_k_m.gguf` | ~310 MB, llama.cpp / Ollama / LM Studio / phone |
+| `sprocket-500m-chat-q4_k_m.gguf` | ~310 MB, llama.cpp / Ollama / LM Studio / phone |
+| `sprocket-500m-chat-f16.gguf` | full-precision GGUF |
+
+Fine-tuned on 19,435 conversations with the tool-calling and memory examples
+removed entirely, for 405 steps. Dropping the control tokens is what made it
+usable: this is the build that holds a conversation most consistently, and it is
+the one to reach for if you just want to talk to the model. It will not emit
+`<|tool_call|>`, by design.
+
+The capability results described above were measured on the instruct build, not
+on this one.
+
+### Instruct build — the tool-calling one
+
+| File | Use |
+|---|---|
+| `model.safetensors` | HF format, loads as `LlamaForCausalLM` |
+| `sprocket-500m-q4_k_m.gguf` | ~310 MB quantized |
 | `sprocket-500m-f16.gguf` | full-precision GGUF |
-| `debug/train.log` | complete training history |
 
-### The `-chat-` files are a different model
+Exported from `500m_sft_final.pt` at step 1192 (see `export_provenance.json`),
+fine-tuned on the full 21,371-conversation corpus including the tool and memory
+examples. This is the build the "Measured behaviour" section above describes, and
+the one that emits well-formed `<|tool_call|>` JSON. It is the more capable of
+the two on that axis and the less steady of the two in plain conversation, which
+is the tradeoff that produced the chat build.
 
-| File | Use |
-|---|---|
-| `sprocket-500m-chat-q4_k_m.gguf` | chat-only build, ~310 MB |
-| `sprocket-500m-chat-f16.gguf` | chat-only build, full precision |
-
-These two were fine-tuned separately, starting from the same pretrained base but
-on a 19,435-conversation corpus with **every tool-calling and memory example
-removed**, for 405 steps rather than 1192. They are a plain conversational
-model. The tool-calling result described above does not apply to them, and they
-will not emit `<|tool_call|>`. If you want the behaviour this card documents,
-use `model.safetensors` or the GGUF files without `-chat-` in the name.
+`debug/train.log` holds the complete training history for both.
 
 ```python
 from transformers import AutoModelForCausalLM, AutoTokenizer

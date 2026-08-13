@@ -152,6 +152,19 @@ signature of a capacity and discrimination limit rather than a data-volume
 problem. That is a result that only shows up if you actually read the generations
 instead of trusting a pass-rate.
 
+The follow-through is the part that mattered. If one control-token pathway was
+already crowding out another, the next question was what the control tokens were
+costing the ordinary conversation. So a second fine-tune ran from the same
+pretrained base with the tool and memory examples removed entirely: 19,435
+conversations over 405 steps. That build holds a conversation more consistently
+than the instruct one, and it is what ships as the `-chat-` GGUF.
+
+Both are published, because they are different tradeoffs against the same base
+rather than one superseding the other. The instruct build can call tools. The
+chat build talks. At 501M parameters the capability budget is real, and spending
+part of it on a mechanical output format has a price that shows up somewhere
+else.
+
 ## Running unattended for 54 hours
 
 A spot instance will be preempted, and a script that needs supervision is a
