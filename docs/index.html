@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sprocket 500M: how the model reads text</title>
-<meta name="description" content="An interactive look at the tokenizer and vocabulary behind Sprocket 500M, a language model trained from scratch.">
+<title>Sprocket 500M: how a language model gets built</title>
+<meta name="description" content="An interactive walkthrough of Sprocket 500M, a language model trained from scratch: its vocabulary, its architecture, how it learned, and what it cost.">
 <style>
   *,*::before,*::after { box-sizing: border-box; }
   :root {
@@ -28,24 +28,38 @@
   body {
     margin:0; background:var(--bg); color:var(--fg);
     font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    line-height:1.6; -webkit-font-smoothing:antialiased;
+    line-height:1.62; -webkit-font-smoothing:antialiased;
   }
-  .wrap { max-width: 860px; margin:0 auto; padding: 48px 20px 80px; }
-  header { border-bottom:1px solid var(--border); padding-bottom:28px; margin-bottom:40px; }
+  .wrap { max-width: 860px; margin:0 auto; padding: 44px 20px 90px; }
+  header { border-bottom:1px solid var(--border); padding-bottom:26px; }
   h1 { font-size: clamp(1.7rem, 4vw, 2.3rem); margin:0 0 10px; letter-spacing:-.025em; line-height:1.2; }
-  h2 { font-size:1.28rem; margin:52px 0 12px; letter-spacing:-.015em; }
-  h3 { font-size:1rem; margin:28px 0 8px; }
+  h2 { font-size:1.3rem; margin:0 0 14px; letter-spacing:-.015em; }
+  h3 { font-size:1rem; margin:30px 0 8px; }
   p { margin: 0 0 16px; }
   .sub { color:var(--fg2); font-size:1.02rem; margin:0; }
   a { color:var(--blue); }
   code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
   code { background:var(--panel); padding:.12em .38em; border-radius:4px; font-size:.9em; }
   .panel { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:20px; }
-  .muted { color:var(--fg2); font-size:.93rem; }
+  .muted { color:var(--fg2); font-size:.94rem; }
   .tiny { color:var(--fg3); font-size:.83rem; }
+  section { padding-top:46px; }
+  .lede { color:var(--fg2); font-size:.95rem; margin:-6px 0 22px; }
+
+  nav {
+    position:sticky; top:0; z-index:20; background:var(--bg);
+    border-bottom:1px solid var(--border); margin-bottom:8px;
+    display:flex; gap:4px; overflow-x:auto; padding:10px 0;
+  }
+  nav a {
+    font-size:.83rem; padding:5px 11px; border-radius:99px; white-space:nowrap;
+    text-decoration:none; color:var(--fg2); border:1px solid transparent;
+  }
+  nav a:hover { border-color:var(--border); color:var(--fg); }
+  nav a .n { color:var(--fg3); margin-right:5px; font-variant-numeric:tabular-nums; }
 
   textarea {
-    width:100%; min-height:104px; resize:vertical; padding:13px 14px;
+    width:100%; min-height:96px; resize:vertical; padding:13px 14px;
     background:var(--bg); color:var(--fg);
     border:1px solid var(--border); border-radius:9px;
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -57,22 +71,17 @@
   .stat { background:var(--bg); border:1px solid var(--border); border-radius:9px; padding:9px 14px; flex:1 1 116px; }
   .stat .k { font-size:.68rem; text-transform:uppercase; letter-spacing:.07em; color:var(--fg3); }
   .stat .v { font-size:1.32rem; font-weight:650; font-variant-numeric:tabular-nums; letter-spacing:-.02em; }
+  .stat .n { font-size:.74rem; color:var(--fg3); }
 
   #tokens { margin-top:18px; display:flex; flex-wrap:wrap; gap:3px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:.93rem; }
-  .tok {
-    padding:3px 1px; border-radius:4px; border:1px solid transparent;
-    white-space:pre; cursor:default; position:relative;
-  }
+  .tok { padding:3px 1px; border-radius:4px; border:1px solid transparent; white-space:pre; position:relative; }
   .tok.a { background:var(--tok-a); border-color:var(--tok-a-br); }
   .tok.b { background:var(--tok-b); border-color:var(--tok-b-br); }
   .tok.sp { background:transparent; border-color:var(--green); color:var(--green); font-weight:600; }
-  .tok .id {
-    position:absolute; left:50%; transform:translateX(-50%); bottom:-15px;
-    font-size:.6rem; color:var(--fg3); opacity:0; transition:opacity .1s; pointer-events:none;
-  }
-  #tokens.ids { margin-bottom:20px; }
+  .tok .id { position:absolute; left:50%; transform:translateX(-50%); bottom:-15px; font-size:.6rem; color:var(--fg3); opacity:0; pointer-events:none; }
   #tokens.ids .tok .id { opacity:1; }
   #tokens.ids .tok { margin-bottom:14px; }
+  #tokens.ids { margin-bottom:20px; }
   .dot { color:var(--fg3); opacity:.55; }
 
   .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:14px; }
@@ -81,40 +90,72 @@
     background:var(--bg); color:var(--fg2); border:1px solid var(--border);
   }
   button:hover, .chip:hover { border-color:var(--blue); color:var(--blue); }
+  button.on { border-color:var(--blue); color:var(--blue); }
   label.toggle { display:inline-flex; align-items:center; gap:7px; font-size:.86rem; color:var(--fg2); cursor:pointer; }
 
-  input[type=search] {
-    width:100%; padding:10px 13px; background:var(--bg); color:var(--fg);
-    border:1px solid var(--border); border-radius:9px; font:inherit; font-size:.93rem;
-  }
+  input[type=search] { width:100%; padding:10px 13px; background:var(--bg); color:var(--fg); border:1px solid var(--border); border-radius:9px; font:inherit; font-size:.93rem; }
   .vgrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(148px,1fr)); gap:6px; margin-top:14px; max-height:330px; overflow-y:auto; padding-right:4px; }
   .vitem { display:flex; justify-content:space-between; gap:8px; background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:5px 9px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:.82rem; }
   .vitem .t { overflow:hidden; text-overflow:ellipsis; white-space:pre; }
   .vitem .i { color:var(--fg3); font-variant-numeric:tabular-nums; flex:none; }
 
+  .sliders { display:grid; gap:14px; margin-bottom:4px; }
+  .sl { display:grid; grid-template-columns: 132px 1fr 84px; gap:12px; align-items:center; }
+  .sl label { font-size:.87rem; color:var(--fg2); }
+  .sl output { font-variant-numeric:tabular-nums; font-size:.9rem; text-align:right; font-weight:600; }
+  input[type=range] { width:100%; accent-color:var(--blue); }
+
+  .bar { display:flex; height:26px; border-radius:7px; overflow:hidden; border:1px solid var(--border); margin-top:6px; }
+  .bar div { display:flex; align-items:center; justify-content:center; font-size:.7rem; color:#fff; white-space:nowrap; }
+  .legend { display:flex; gap:16px; flex-wrap:wrap; font-size:.82rem; color:var(--fg2); margin-top:9px; }
+  .legend span { display:inline-flex; align-items:center; gap:6px; }
+  .sw { width:11px; height:11px; border-radius:3px; display:inline-block; }
+
+  .chart-wrap { position:relative; margin-top:8px; color:var(--fg); }
+  .chart-tip {
+    position:absolute; top:6px; pointer-events:none; opacity:0; transition:opacity .08s;
+    background:var(--bg); border:1px solid var(--border); border-radius:8px;
+    padding:7px 10px; font-size:.78rem; white-space:nowrap; z-index:5;
+    box-shadow:0 4px 16px rgba(0,0,0,.16); font-variant-numeric:tabular-nums;
+  }
+  .chart-tip .k { color:var(--fg3); margin-bottom:2px; }
+
   table { border-collapse:collapse; width:100%; font-size:.9rem; margin-top:10px; }
   th,td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--border); vertical-align:top; }
   th { color:var(--fg2); font-weight:600; font-size:.8rem; text-transform:uppercase; letter-spacing:.05em; }
-  td.mono { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; white-space:nowrap; }
+  td.mono, td.num { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; white-space:nowrap; }
+  td.num { text-align:right; font-variant-numeric:tabular-nums; }
   .wrapx { overflow-x:auto; }
-  footer { margin-top:64px; padding-top:22px; border-top:1px solid var(--border); color:var(--fg3); font-size:.87rem; }
+  footer { margin-top:70px; padding-top:22px; border-top:1px solid var(--border); color:var(--fg3); font-size:.87rem; }
   .loading { color:var(--fg3); font-size:.9rem; }
+  .callout { border-left:3px solid var(--blue); padding:2px 0 2px 15px; margin:20px 0; color:var(--fg2); }
+  @media (max-width:560px) { .sl { grid-template-columns: 1fr; gap:4px; } .sl output { text-align:left; } }
 </style>
 </head>
 <body>
 <div class="wrap">
 
 <header>
-  <h1>How Sprocket reads text</h1>
+  <h1>How a language model gets built</h1>
   <p class="sub">
-    Sprocket is a 501M-parameter language model trained from scratch. Before it can
-    learn anything from a sentence, the sentence has to be turned into numbers. This
-    page shows the piece that does that, running live in your browser on the real
-    vocabulary the model was trained with.
+    Sprocket is a 501-million-parameter language model trained from scratch on one
+    rented GPU. This page walks through what it is made of and how it got that way,
+    using the real vocabulary and the real numbers from the training run. Everything
+    here runs in your browser.
   </p>
 </header>
 
-<h2>A model never sees letters</h2>
+<nav>
+  <a href="#reading"><span class="n">1</span>Reading text</a>
+  <a href="#inside"><span class="n">2</span>What it is made of</a>
+  <a href="#learning"><span class="n">3</span>How it learned</a>
+  <a href="#cost"><span class="n">4</span>What it cost</a>
+</nav>
+
+<!-- ============================================================ 1 -->
+<section id="reading">
+<h2>1. Reading text</h2>
+<p class="lede">A model cannot read letters. Something has to turn writing into numbers first.</p>
 
 <p>
   A language model works with a fixed list of numbered pieces of text. Every input
@@ -137,8 +178,6 @@
   that needs more pieces to write the same sentence means more compute per page of
   text, a shorter effective memory, and a larger bill.
 </p>
-
-<h2>Try it</h2>
 
 <div class="panel">
   <textarea id="input" spellcheck="false" aria-label="Text to tokenize">The goblin tinkered with the machine until it finally worked.</textarea>
@@ -165,7 +204,7 @@
   </p>
 </div>
 
-<h2>Where these 32,000 pieces came from</h2>
+<h3>Where these 32,000 pieces came from</h3>
 
 <p>
   Nobody chose them. The vocabulary was <em>learned</em> from text, using an
@@ -211,7 +250,7 @@
   vocabulary from the start, and anything at all can be spelled out.
 </p>
 
-<h2>Browse the real vocabulary</h2>
+<h3>Browse the real vocabulary</h3>
 
 <div class="panel">
   <input type="search" id="vsearch" placeholder="Search the vocabulary, or type an ID number" aria-label="Search vocabulary">
@@ -219,7 +258,7 @@
   <p class="tiny" id="vcount" style="margin:12px 0 0"></p>
 </div>
 
-<h2>The 16 reserved entries</h2>
+<h3>The 16 reserved entries</h3>
 
 <p>
   Not every entry was learned. Sixteen were set aside by hand before training, and
@@ -241,39 +280,319 @@
   would mean a piece the model has never seen, so the full set has to be planned
   before the first token is ever encoded.
 </p>
+</section>
+
+<!-- ============================================================ 2 -->
+<section id="inside">
+<h2>2. What it is made of</h2>
+<p class="lede">501 million numbers, arranged in a particular shape. The shape is the design.</p>
+
+<p>
+  Once text is a list of numbers, the model turns each number into a long list of
+  decimals, then pushes that through the same block of machinery 26 times over. At
+  the end it produces a score for every one of the 32,000 vocabulary entries, and
+  the highest score is its guess at what comes next. That is the entire job:
+  guess the next piece, over and over.
+</p>
+
+<p>
+  Each of those 26 blocks does two things. First, <strong>attention</strong>, which
+  lets every position look back at the earlier positions and pull in what is
+  relevant, so that by the time the model reaches "it" in a sentence it can carry
+  information about what "it" refers to. Second, a <strong>feed-forward</strong>
+  step, which is where most of the parameters live and where most of what the model
+  knows is stored.
+</p>
+
+<p>
+  A <strong>parameter</strong> is just one adjustable number. Training means nudging
+  all 501 million of them, repeatedly, until the guesses get better. Nobody sets
+  them by hand and nobody can point at one and say what it does.
+</p>
+
+<div class="panel">
+  <div class="sliders">
+    <div class="sl">
+      <label for="r-dim">Width</label>
+      <input type="range" id="r-dim" min="256" max="2560" step="64" value="1280">
+      <output id="o-dim">1280</output>
+    </div>
+    <div class="sl">
+      <label for="r-layers">Layers</label>
+      <input type="range" id="r-layers" min="4" max="48" step="1" value="26">
+      <output id="o-layers">26</output>
+    </div>
+    <div class="sl">
+      <label for="r-heads">Attention heads</label>
+      <input type="range" id="r-heads" min="4" max="40" step="1" value="20">
+      <output id="o-heads">20</output>
+    </div>
+    <div class="sl">
+      <label for="r-kv">Key/value heads</label>
+      <input type="range" id="r-kv" min="1" max="40" step="1" value="4">
+      <output id="o-kv">4</output>
+    </div>
+  </div>
+
+  <div class="row" style="margin-bottom:6px">
+    <button id="reset-arch" class="on">Reset to Sprocket</button>
+    <span class="tiny" id="arch-note"></span>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="k">parameters</div><div class="v" id="a-total">0</div><div class="n" id="a-vs"></div></div>
+    <div class="stat"><div class="k">memory to train</div><div class="v" id="a-train">0</div><div class="n">weights, gradients, optimizer</div></div>
+    <div class="stat"><div class="k">memory to run</div><div class="v" id="a-infer">0</div><div class="n">weights only</div></div>
+  </div>
+
+  <div class="bar" id="a-bar"></div>
+  <div class="legend">
+    <span><i class="sw" style="background:var(--blue)"></i>vocabulary lookup <b id="a-emb"></b></span>
+    <span><i class="sw" style="background:var(--orange)"></i>attention <b id="a-attn"></b></span>
+    <span><i class="sw" style="background:var(--green)"></i>feed-forward <b id="a-ffn"></b></span>
+  </div>
+</div>
+
+<p class="tiny" style="margin-top:12px">
+  These are exact counts, not estimates. <code>scripts/verify_web_modelmath.py</code>
+  builds each real model in PyTorch and fails if this page disagrees by a single
+  parameter.
+</p>
+
+<h3>Two dials that do very different things</h3>
+
+<p>
+  Drag <strong>width</strong> and the count moves fast, because widening the model
+  makes every matrix bigger in both directions at once. Drag <strong>layers</strong>
+  and it moves in a straight line, because each layer is a fixed cost. Wider models
+  hold more per layer; deeper models do more steps of reasoning. Sprocket is
+  relatively deep and narrow for its size, which suits a model meant to run on
+  small hardware.
+</p>
+
+<p>
+  Now drag <strong>key/value heads</strong> and watch how little the parameter count
+  cares. It barely moves, which makes it look unimportant. It is not. That setting
+  controls something the parameter count cannot show you.
+</p>
+
+<div class="callout">
+  <p style="margin:0">
+    While the model is generating, it keeps notes on everything it has already
+    written so it does not have to redo that work for every new word. Those notes
+    grow with every token, and on a phone or a laptop they, not the model itself,
+    are usually what runs the memory out.
+  </p>
+</div>
+
+<p>
+  Sprocket uses 20 attention heads but only 4 sets of those notes, shared between
+  them. That is a five-fold reduction in the thing that grows without limit, in
+  exchange for a small amount of flexibility. At its full 2,048-token context the
+  notes come to <strong id="a-kv">0</strong>. With one set of notes per head, the
+  same context would need <strong id="a-kv-full">0</strong>.
+</p>
+
+<p class="muted">
+  This is the kind of decision that only makes sense if you know where the model is
+  going to run. For something intended to work on a laptop or a phone, shrinking the
+  part that grows with conversation length matters more than the part that is fixed
+  the moment training ends.
+</p>
+</section>
+
+<!-- ============================================================ 3 -->
+<section id="learning">
+<h2>3. How it learned</h2>
+<p class="lede">Twenty billion tokens, 152,580 adjustments, 54 hours, one measurement of whether it was working.</p>
+
+<p>
+  Training is a loop. Show the model some text with the next piece hidden, let it
+  guess, measure how wrong the guess was, and nudge every parameter a little in the
+  direction that would have made it less wrong. Then do that 152,580 times.
+</p>
+
+<p>
+  The measure of wrongness is called <strong>loss</strong>, and it has a meaning you
+  can hold onto. A model that knows nothing at all would spread its guess evenly
+  across all 32,000 entries, and that gives a loss of about <strong>10.4</strong>.
+  A model that always guessed correctly with total confidence would score 0. Every
+  real model lives somewhere in between, and the whole run is just that number
+  coming down.
+</p>
+
+<div class="panel">
+  <div class="row" style="margin-top:0;margin-bottom:10px">
+    <button class="phase on" data-phase="pretrain">Learning language</button>
+    <button class="phase" data-phase="sft">Learning to answer</button>
+    <button class="phase" data-phase="speed">Speed</button>
+  </div>
+  <div class="chart-wrap" id="chart"></div>
+  <div class="legend" id="chart-legend"></div>
+  <p class="tiny" id="chart-note" style="margin-top:10px"></p>
+</div>
+
+<p style="margin-top:20px">
+  Sprocket started at 10.4, exactly where a model that has never seen text starts,
+  and finished at <strong>2.564</strong>. Another way to say the same thing: at the
+  end it was about as uncertain as if it were choosing between roughly
+  <strong>13</strong> options each time, rather than 32,000.
+</p>
+
+<p>
+  The steep drop at the very start is the model learning that some letters are
+  common and some are rare. It takes minutes and looks impressive on a chart. The
+  remaining 95% of the run is the part that actually produces a usable model, and on
+  a chart it looks like almost nothing happening, which is why the first view above
+  hides the opening plunge.
+</p>
+
+<h3>Two stages, two different jobs</h3>
+
+<p>
+  The long run produces something that continues text but does not answer. Ask it a
+  question and it might reply with more questions, because a great deal of the
+  internet is questions followed by more questions. It has learned language, not
+  conversation.
+</p>
+
+<p>
+  A second, much shorter stage fixes that, training on example exchanges. The
+  scoring is masked so the model is only graded on the replies, never on predicting
+  what the person said. That distinction matters: without it the model spends
+  capacity learning to imitate users, which is not the job.
+</p>
+
+<p class="muted">
+  That second stage is about 1,200 steps against 152,580. Almost all the compute
+  goes into learning language, and a comparatively tiny amount goes into shaping how
+  it responds. That ratio is roughly what it looks like for every chat model.
+</p>
+</section>
+
+<!-- ============================================================ 4 -->
+<section id="cost">
+<h2>4. What it cost</h2>
+<p class="lede">Every architecture decision eventually turns into an hourly rate.</p>
+
+<p>
+  Training cost is mostly one calculation: work per token, times number of tokens,
+  divided by how fast the hardware does work. Work per token is set by the parameter
+  count, so a model twice the size takes about twice as long on the same machine.
+  Nothing about this is subtle, but it is easy to not do until the bill arrives.
+</p>
+
+<div class="panel">
+  <div class="sliders">
+    <div class="sl">
+      <label for="r-params">Model size</label>
+      <input type="range" id="r-params" min="50" max="3000" step="1" value="501">
+      <output id="o-params">501M</output>
+    </div>
+    <div class="sl">
+      <label for="r-tokens">Training tokens</label>
+      <input type="range" id="r-tokens" min="1" max="200" step="1" value="20">
+      <output id="o-tokens">20B</output>
+    </div>
+  </div>
+
+  <div class="row" style="margin-bottom:6px">
+    <button data-cost="501,20" class="on">What Sprocket did</button>
+    <button data-cost="501,50">More text</button>
+    <button data-cost="1100,20">Bigger model</button>
+    <button data-cost="501,200">Properly trained</button>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="k">time on one H100</div><div class="v" id="c-hours">0</div><div class="n" id="c-days"></div></div>
+    <div class="stat"><div class="k">cost at $2.99/hr</div><div class="v" id="c-cost">0</div><div class="n">GPU rental only</div></div>
+    <div class="stat"><div class="k">tokens per parameter</div><div class="v" id="c-tpp">0</div><div class="n" id="c-tpp-note"></div></div>
+  </div>
+</div>
+
+<p class="tiny" style="margin-top:12px">
+  Scaled from throughput measured on the actual machine, 115,295 tokens per second
+  for this model, not from a hardware vendor's peak figure. It covers the main
+  training stage only.
+</p>
+
+<h3>Why more text stops helping</h3>
+
+<p>
+  Slide the token count up and the cost rises in a straight line. Quality does not.
+  Going from 10 billion tokens to 50 billion costs five times as much and buys
+  roughly a 21% improvement, with most of the benefit arriving early. The curve
+  flattens somewhere around 15 to 20 billion, which is why 20 was chosen.
+</p>
+
+<p>
+  The number that decides what a model should be compared against is
+  <strong>tokens per parameter</strong>. Sprocket saw 40. GPT-2-medium saw about 28
+  and Cerebras-GPT-590M saw 20, so those are its honest peer group. Qwen2.5-0.5B is
+  almost exactly the same size but saw around 36,000, which is roughly 900 times
+  more text. It is a far better model, and no architectural cleverness closes a gap
+  like that. Only more training does, and more training is the line going up in the
+  panel above.
+</p>
+
+<h3>The machine it was not trained on</h3>
+
+<p>
+  Development happened on a desktop graphics card with 8GB of memory, about 7GB of
+  it usable. Running a model needs room for its weights. <em>Training</em> one needs
+  room for the weights, a full set of correction values the same size, and two more
+  sets the optimizer keeps as running averages. That comes to roughly 16 bytes per
+  parameter, so the memory needed to train is about eight times what is needed to
+  run.
+</p>
+
+<p>
+  For Sprocket that is <strong>8.0GB</strong> of pure bookkeeping before a single
+  piece of text is loaded, against 7GB available. It missed, and not by an amount
+  any tuning could recover. Go back to the sliders in section 2 and watch "memory to
+  train" against "memory to run" to see how quickly that gap opens.
+</p>
+
+<p>
+  So the plan became: build and debug everything against a small model that trains
+  overnight on the desktop, and rent a large GPU only once the identical code had
+  run start to finish unattended. The rented machine is for training, not for
+  finding out that a path was misspelled.
+</p>
 
 <footer>
   <p>
     Part of <a href="https://github.com/kandivault-source/Sprocket-500M">Sprocket 500M</a>.
-    The model is on <a href="https://huggingface.co/kandivault/sprocket-500m">Hugging Face</a>.
+    The model itself is on <a href="https://huggingface.co/kandivault/sprocket-500m">Hugging Face</a>.
   </p>
   <p class="tiny">
-    Everything on this page runs in your browser. The tokenizer is a JavaScript
-    reimplementation of the model's real one, checked against it for agreement.
+    Every number on this page comes from the project's own training log or is
+    computed from the real model configuration. The tokenizer and the parameter
+    arithmetic are both checked against the originals by scripts in the repository.
   </p>
 </footer>
 
 </div>
 
 <script src="tokenizer.js"></script>
+<script src="chart.js"></script>
+<script src="modelmath.js"></script>
 <script>
 (function () {
   "use strict";
 
-  var TK = null;
+  var $ = function (id) { return document.getElementById(id); };
   var fromByteString = SprocketTokenizer.fromByteString;
   var toByteString = SprocketTokenizer.toByteString;
-  var IDS = null, SPECIALS = null;
 
-  function encode(text) { return TK ? TK.encode(text) : []; }
-
-  // ---- rendering ----------------------------------------------------------
-  var $ = function (id) { return document.getElementById(id); };
+  // ---------------------------------------------------------------- 1. tokens
+  var TK = null, IDS = null, SPECIALS = null, SPECIALS_BY_ID = {};
   var input = $("input"), box = $("tokens");
 
-  function render() {
+  function renderTokens() {
+    if (!TK) return;
     var text = input.value;
-    var toks = encode(text);
+    var toks = TK.encode(text);
     $("s-chars").textContent = text.length.toLocaleString();
     $("s-tokens").textContent = toks.length.toLocaleString();
     $("s-ratio").textContent = toks.length ? (text.length / toks.length).toFixed(2) : "0";
@@ -284,8 +603,7 @@
       var tk = toks[i];
       var el = document.createElement("span");
       el.className = "tok " + (tk.special ? "sp" : (i % 2 ? "b" : "a"));
-      var shown = tk.special ? tk.t : fromByteString(tk.t);
-      // A leading space is part of the token; show it rather than let it vanish.
+      var shown = TK.display(tk);
       if (!tk.special && shown.charAt(0) === " ") {
         var d = document.createElement("span");
         d.className = "dot"; d.textContent = "·";
@@ -333,20 +651,13 @@
       frag.appendChild(row);
     }
     grid.appendChild(frag);
-    if (!hits.length) {
-      $("vcount").textContent = "no matches";
-    } else if (!q) {
-      $("vcount").textContent = "showing the first " + hits.length.toLocaleString() +
-        " of 32,000. Search to find a specific one.";
-    } else if (hits.length >= 400) {
-      $("vcount").textContent = "showing the first 400 matches";
-    } else {
-      $("vcount").textContent = hits.length.toLocaleString() +
-        (hits.length === 1 ? " match" : " matches");
-    }
-  }
 
-  var SPECIALS_BY_ID = {};
+    if (!hits.length) $("vcount").textContent = "no matches";
+    else if (!q) $("vcount").textContent = "showing the first " + hits.length.toLocaleString() +
+      " of 32,000. Search to find a specific one.";
+    else if (hits.length >= 400) $("vcount").textContent = "showing the first 400 matches";
+    else $("vcount").textContent = hits.length.toLocaleString() + (hits.length === 1 ? " match" : " matches");
+  }
 
   function describe(tok) {
     var map = {
@@ -363,22 +674,18 @@
       "<|memory_read|>": "The model is recalling a stored fact",
       "<|memory_write|>": "The model is asking to store a fact"
     };
-    return map[tok] || "Reserved for future use";
+    return map[tok] || "Reserved, unused so far";
   }
 
   fetch("tokenizer-data.json")
-    .then(function (r) {
-      if (!r.ok) throw new Error("HTTP " + r.status);
-      return r.json();
-    })
+    .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
     .then(function (d) {
       TK = new SprocketTokenizer.Tokenizer(d);
       IDS = d.tokens;
       SPECIALS = d.specials;
 
-      var i;
       var keys = Object.keys(SPECIALS).sort(function (a, b) { return SPECIALS[a] - SPECIALS[b]; });
-      for (i = 0; i < keys.length; i++) SPECIALS_BY_ID[SPECIALS[keys[i]]] = keys[i];
+      for (var i = 0; i < keys.length; i++) SPECIALS_BY_ID[SPECIALS[keys[i]]] = keys[i];
 
       var tb = $("specials");
       for (i = 0; i < keys.length; i++) {
@@ -389,27 +696,222 @@
         tr.appendChild(a); tr.appendChild(b); tr.appendChild(c);
         tb.appendChild(tr);
       }
-
-      render();
+      renderTokens();
       renderVocab("");
     })
     .catch(function (e) {
       box.innerHTML = '<span class="loading">Could not load the vocabulary (' +
-        String(e.message || e) + '). This page needs to be served over http, not opened as a file.</span>';
+        String(e.message || e) + ').</span>';
     });
 
-  input.addEventListener("input", render);
-  $("showids").addEventListener("change", function () {
-    box.classList.toggle("ids", this.checked);
-  });
+  input.addEventListener("input", renderTokens);
+  $("showids").addEventListener("change", function () { box.classList.toggle("ids", this.checked); });
   $("vsearch").addEventListener("input", function () { renderVocab(this.value); });
-  var btns = document.querySelectorAll("button[data-sample]");
-  for (var i = 0; i < btns.length; i++) {
-    btns[i].addEventListener("click", function () {
+  Array.prototype.forEach.call(document.querySelectorAll("button[data-sample]"), function (b) {
+    b.addEventListener("click", function () {
       input.value = this.getAttribute("data-sample");
-      render();
+      renderTokens();
+    });
+  });
+
+  // ---------------------------------------------------------------- 2. shape
+  var MM = ModelMath;
+
+  // Decimal units, matching how the rest of the project quotes memory (and how
+  // the exported model file is measured). Mixing GB and GiB here would put a
+  // number on screen that contradicts the paragraph next to it.
+  function bytes(n) {
+    if (n >= 1e9) return (n / 1e9).toFixed(2) + " GB";
+    if (n >= 1e6) return (n / 1e6).toFixed(1) + " MB";
+    return (n / 1e3).toFixed(0) + " KB";
+  }
+  function millions(n) {
+    return n >= 1e9 ? (n / 1e9).toFixed(2) + "B" : (n / 1e6).toFixed(1) + "M";
+  }
+
+  function readArch() {
+    var heads = +$("r-heads").value;
+    var kv = Math.min(+$("r-kv").value, heads);
+    var dim = +$("r-dim").value;
+    // head_dim must divide evenly, and RoPE needs it even.
+    var headDim = Math.floor(dim / heads);
+    if (headDim < 2) headDim = 2;
+    return {
+      vocab: 32000, dim: dim, layers: +$("r-layers").value,
+      heads: heads, kvHeads: kv, ffnMultiple: 256, ctx: 2048
+    };
+  }
+
+  function renderArch() {
+    var c = readArch();
+    $("o-dim").textContent = c.dim;
+    $("o-layers").textContent = c.layers;
+    $("o-heads").textContent = c.heads;
+    $("o-kv").textContent = c.kvHeads;
+
+    var p = MM.paramCount(c);
+    $("a-total").textContent = millions(p.total);
+    $("a-train").textContent = bytes(MM.trainingBytes(p.total));
+    $("a-infer").textContent = bytes(MM.inferenceBytes(p.total));
+
+    var isReal = c.dim === 1280 && c.layers === 26 && c.heads === 20 && c.kvHeads === 4;
+    $("a-vs").textContent = isReal ? "this is Sprocket" :
+      (p.total > 501090560 ? "+" : "") +
+      ((p.total - 501090560) / 1e6).toFixed(1) + "M vs Sprocket";
+    $("reset-arch").classList.toggle("on", isReal);
+    $("arch-note").textContent = c.dim % c.heads !== 0
+      ? "width is not divisible by heads; the real model requires that"
+      : "";
+
+    var attn = p.attnPerLayer * c.layers, ffn = p.ffnPerLayer * c.layers;
+    var tot = p.embedding + attn + ffn;
+    var bar = $("a-bar");
+    bar.textContent = "";
+    var parts = [["var(--blue)", p.embedding], ["var(--orange)", attn], ["var(--green)", ffn]];
+    parts.forEach(function (pt) {
+      var d = document.createElement("div");
+      d.style.background = pt[0];
+      d.style.width = (pt[1] / tot * 100) + "%";
+      var pct = Math.round(pt[1] / tot * 100);
+      d.textContent = pct >= 7 ? pct + "%" : "";
+      bar.appendChild(d);
+    });
+    $("a-emb").textContent = millions(p.embedding);
+    $("a-attn").textContent = millions(attn);
+    $("a-ffn").textContent = millions(ffn);
+
+    var perTok = MM.kvBytesPerToken(c);
+    $("a-kv").textContent = bytes(perTok * c.ctx);
+    var full = Object.assign({}, c, { kvHeads: c.heads });
+    $("a-kv-full").textContent = bytes(MM.kvBytesPerToken(full) * c.ctx);
+  }
+
+  ["r-dim", "r-layers", "r-heads", "r-kv"].forEach(function (id) {
+    $(id).addEventListener("input", renderArch);
+  });
+  $("reset-arch").addEventListener("click", function () {
+    $("r-dim").value = 1280; $("r-layers").value = 26;
+    $("r-heads").value = 20; $("r-kv").value = 4;
+    renderArch();
+  });
+  renderArch();
+
+  // ---------------------------------------------------------------- 3. curves
+  var RUN = null, phase = "pretrain";
+
+  function drawPhase() {
+    if (!RUN) return;
+    var host = $("chart"), legend = $("chart-legend"), note = $("chart-note");
+    var blue = getComputedStyle(document.body).getPropertyValue("--blue").trim();
+    var orange = getComputedStyle(document.body).getPropertyValue("--orange").trim();
+    var p = RUN.pretrain;
+
+    if (phase === "pretrain") {
+      // Skip the opening collapse: it compresses everything else into a flat band.
+      var cut = p.total_tokens * 0.05, i0 = 0;
+      while (i0 < p.tokens.length && p.tokens[i0] < cut) i0++;
+      MiniChart.draw(host, {
+        series: [
+          { name: "train", color: blue, x: p.tokens.slice(i0), y: p.train.slice(i0) },
+          { name: "validation", color: orange, x: p.tokens.slice(i0), y: p.val.slice(i0) }
+        ],
+        xlabel: "tokens seen", ylabel: "loss", height: 280,
+        xfmt: function (v) { return v.toFixed(1) + "B"; },
+        yfmt: function (v) { return v.toFixed(2); }
+      });
+      legend.innerHTML = '<span><i class="sw" style="background:' + blue + '"></i>train</span>' +
+        '<span><i class="sw" style="background:' + orange + '"></i>validation</span>';
+      note.textContent = "The first billion tokens are hidden. Validation is measured on text " +
+        "the model is never trained on, so the two lines tracking each other means it is " +
+        "learning the language rather than memorising the corpus.";
+    } else if (phase === "sft") {
+      var s = RUN.sft;
+      MiniChart.draw(host, {
+        series: [
+          { name: "train", color: blue, x: s.step, y: s.train },
+          { name: "validation", color: orange, x: s.step, y: s.val }
+        ],
+        xlabel: "step", ylabel: "loss", height: 280,
+        xfmt: function (v) { return String(Math.round(v)); },
+        yfmt: function (v) { return v.toFixed(2); }
+      });
+      legend.innerHTML = '<span><i class="sw" style="background:' + blue + '"></i>train</span>' +
+        '<span><i class="sw" style="background:' + orange + '"></i>validation</span>';
+      note.textContent = s.total_steps + " steps, about " + s.epochs +
+        " passes over the conversation set. The two lines separating after roughly step 600 " +
+        "is the model starting to memorise those examples rather than learn from them.";
+    } else {
+      MiniChart.draw(host, {
+        series: [{ name: "tokens/sec", color: blue, x: p.tokens, y: p.tps }],
+        xlabel: "tokens seen", ylabel: "tokens per second", height: 280, y0: 0,
+        xfmt: function (v) { return v.toFixed(1) + "B"; },
+        yfmt: function (v) { return Math.round(v / 1000) + "k"; }
+      });
+      legend.innerHTML = "";
+      note.textContent = "Flat for 54 hours. A drooping line here would mean the GPU " +
+        "overheating or the data pipeline stalling; the brief climb at the start is " +
+        "one-time compilation.";
+    }
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll("button.phase"), function (b) {
+    b.addEventListener("click", function () {
+      Array.prototype.forEach.call(document.querySelectorAll("button.phase"), function (o) {
+        o.classList.remove("on");
+      });
+      this.classList.add("on");
+      phase = this.getAttribute("data-phase");
+      drawPhase();
+    });
+  });
+
+  fetch("run-data.json")
+    .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+    .then(function (d) { RUN = d; drawPhase(); })
+    .catch(function (e) {
+      $("chart").innerHTML = '<span class="loading">Could not load the run data (' +
+        String(e.message || e) + ').</span>';
+    });
+
+  window.addEventListener("resize", function () { clearTimeout(window.__rt);
+    window.__rt = setTimeout(drawPhase, 150); });
+
+  // ---------------------------------------------------------------- 4. cost
+  function renderCost() {
+    var pm = +$("r-params").value;         // millions
+    var tb = +$("r-tokens").value;         // billions
+    var params = pm * 1e6, tokens = tb * 1e9;
+
+    $("o-params").textContent = pm >= 1000 ? (pm / 1000).toFixed(2) + "B" : pm + "M";
+    $("o-tokens").textContent = tb + "B";
+
+    var hours = MM.trainingHours(params, tokens);
+    var cost = MM.trainingCost(params, tokens);
+    var tpp = MM.tokensPerParam(params, tokens);
+
+    $("c-hours").textContent = hours < 1 ? (hours * 60).toFixed(0) + " min" : hours.toFixed(1) + " h";
+    $("c-days").textContent = hours > 48 ? (hours / 24).toFixed(1) + " days of wall clock" : "";
+    $("c-cost").textContent = "$" + Math.round(cost).toLocaleString();
+    $("c-tpp").textContent = Math.round(tpp).toLocaleString();
+    $("c-tpp-note").textContent =
+      tpp < 60 ? "GPT-2 era" : tpp < 600 ? "under-trained by modern standards" :
+      tpp < 5000 ? "respectable" : "modern small-model territory";
+
+    Array.prototype.forEach.call(document.querySelectorAll("button[data-cost]"), function (b) {
+      var v = b.getAttribute("data-cost").split(",");
+      b.classList.toggle("on", +v[0] === pm && +v[1] === tb);
     });
   }
+  $("r-params").addEventListener("input", renderCost);
+  $("r-tokens").addEventListener("input", renderCost);
+  Array.prototype.forEach.call(document.querySelectorAll("button[data-cost]"), function (b) {
+    b.addEventListener("click", function () {
+      var v = this.getAttribute("data-cost").split(",");
+      $("r-params").value = v[0]; $("r-tokens").value = v[1];
+      renderCost();
+    });
+  });
+  renderCost();
 })();
 </script>
 </body>

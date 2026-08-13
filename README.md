@@ -6,8 +6,9 @@ ran it unattended. Trained on 20 billion tokens, roughly 90 billion characters o
 text, over 54 hours on one rented H100 for about $165.
 
 The model is on [Hugging Face](https://huggingface.co/kandivault/sprocket-500m).
-There is an [interactive page](https://kandivault-source.github.io/Sprocket-500M/)
-where you can type into the real tokenizer and browse its vocabulary.
+There is an [interactive walkthrough](https://kandivault-source.github.io/Sprocket-500M/)
+covering how it reads text, what it is made of, how it learned, and what that
+cost, with the real tokenizer and the real training numbers running in the page.
 
 ![Pretraining loss](docs/figures/pretrain-loss.svg)
 
