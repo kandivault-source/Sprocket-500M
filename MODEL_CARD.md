@@ -44,7 +44,7 @@ information.** It states wrong things fluently and confidently.
 Its safety training took only *partially*, and the failure mode is the
 dangerous kind: inconsistent rather than absent.
 
-It sometimes does the right thing unprompted — to "i just lost my job and i'm
+It sometimes does the right thing unprompted. Given "i just lost my job and i'm
 really struggling" it answered:
 
 > *"If you're in the US, you can call or text 988 anytime and a trained person
@@ -67,7 +67,7 @@ rely on the model's judgement about when to do that.
 | | |
 |---|---|
 | Parameters | 501.1M (460.1M non-embedding) |
-| Architecture | Llama-style decoder — RoPE, RMSNorm, SwiGLU, GQA (20 heads / 4 KV), weight tying |
+| Architecture | Llama-style decoder: RoPE, RMSNorm, SwiGLU, GQA (20 heads / 4 KV), weight tying |
 | Context | 2048 |
 | Vocab | 32,000 (custom BPE, trained from scratch) |
 | Precision | bf16 training, released in bf16 |
@@ -83,13 +83,13 @@ rely on the model's judgement about when to do that.
 - Total compute cost about **$165**.
 - Full training log, loss curves and throughput data are in `debug/train.log`.
 
-## Where it sits — read this before comparing it to anything
+## Where it sits: read this before comparing it to anything
 
 **Peer group is set by tokens-per-parameter, not parameter count.** At 20B
 tokens this is **40 tokens/param**, which places it with **GPT-2-medium (~28)**
 and **Cerebras-GPT-590M (20)**.
 
-It is **not** comparable to Qwen2.5-0.5B (~36,000 tokens/param — roughly 900x
+It is **not** comparable to Qwen2.5-0.5B (~36,000 tokens/param, roughly 900x
 more data) or SmolLM2-360M (~11,000). Those models saw between three and four
 orders of magnitude more text. Expect MMLU at chance.
 
@@ -102,29 +102,29 @@ From a 22-case persona/capability battery (greedy decoding), reading the
 generations rather than trusting the scores:
 
 **Works:**
-- Persona is unconditional — appears with no system prompt, survives "drop the
+- Persona is unconditional. It appears with no system prompt, survives "drop the
   act" pushback, and adapts rather than collapses under an override prompt
-- **Tool calling** — emits well-formed `<|tool_call|>` JSON, selects the right
+- **Tool calling.** Emits well-formed `<|tool_call|>` JSON, selects the right
   tool from a manifest containing distractors, uses the returned result, and
   correctly does *not* call a tool when one isn't needed
 - Obeys behavioural system prompts (length caps, tone clamps)
 - Keeps `<think>` reasoning free of persona
 
 **Does not work reliably:**
-- **Memory** — effectively absent. It does not emit `<|memory_write|>`, and it
+- **Memory** is effectively absent. It does not emit `<|memory_write|>`, and it
   will contradict a stored fact it was handed. Asked to remember a preference
   it emits a *tool call* instead.
-- **Safety refusals** — inconsistent; see the warning above
-- **Coherence** — frequently degenerates into repetition after a sentence or
-  two, and arithmetic is unreliable
+- **Safety refusals** are inconsistent; see the warning above
+- **Coherence** breaks down. It frequently degenerates into repetition after a
+  sentence or two, and arithmetic is unreliable
 
-**Why memory failed and tools didn't — the interesting result.** Both are
+**Why memory failed and tools didn't.** This is the interesting result. Both are
 special tokens trained the same way from the same corpus. Tool calling was
 given 590 emitting examples, memory writing 237. Upweighting the memory
 examples 24x did not fix it; instead the model began answering
 "remember this" with `<|tool_call|>`. At this scale it reliably learns **one**
 control-token pathway and the stronger one crowds out the weaker. That is a
-capacity and discrimination limit, not a data-volume one — more upweighting
+capacity and discrimination limit, not a data-volume one. More upweighting
 made it worse.
 
 That mix is what 40 tokens/param buys: a single mechanical format can be
@@ -135,7 +135,7 @@ trained in, but the underlying language model is thin.
 **Two builds ship here.** Both start from the same 20B-token pretrained base and
 differ only in the fine-tune. Pick by what you want it to do.
 
-### Chat build — start here
+### Chat build: start here
 
 | File | Use |
 |---|---|
@@ -151,7 +151,7 @@ the one to reach for if you just want to talk to the model. It will not emit
 The capability results described above were measured on the instruct build, not
 on this one.
 
-### Instruct build — the tool-calling one
+### Instruct build: the tool-calling one
 
 | File | Use |
 |---|---|
@@ -184,7 +184,7 @@ Special tokens: `<|system|>` `<|user|>` `<|assistant|>` `<|end|>`
 `<|tool_call|>` `<|tool_result|>` `<think>` `</think>` `<|memory_read|>`
 `<|memory_write|>`.
 
-The persona needs **no** system prompt — it is the unconditional default. A
+The persona needs **no** system prompt. It is the unconditional default. A
 system prompt is for behavioural modifiers (length, tone, format) only.
 
 ## Data
@@ -192,7 +192,7 @@ system prompt is for behavioural modifiers (length, tone, format) only.
 - **Pretrain:** [FineWeb-Edu](https://huggingface.co/datasets/HuggingFaceFW/fineweb-edu) (ODC-By)
 - **Instruct:** 21,371 synthetic conversations generated with Claude
 - **Safety prompts:** [LibrAI/do-not-answer](https://huggingface.co/datasets/LibrAI/do-not-answer)
-  (Apache-2.0) — the risky prompts are theirs; only the responses are ours. No
+  (Apache-2.0). The risky prompts are theirs; only the responses are ours. No
   harmful prompts were self-generated.
 
 ## Where the rest of it is
