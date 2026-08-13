@@ -1,0 +1,6 @@
+# Serve these files as-is.
+#
+# GitHub Pages runs Jekyll over a site by default, which silently skips any file
+# or directory whose name starts with an underscore and rewrites others. This is
+# a plain static page that needs its files served exactly as committed, so this
+# marker turns that processing off. It also makes the build faster.
