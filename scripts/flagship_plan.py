@@ -116,7 +116,7 @@ print("\n" + "=" * 78)
 print("CLOUD — time & cost for the 500M flagship  (FLOPs = 6*N*D)")
 print("=" * 78)
 # (name, dense bf16 TFLOPS, assumed MFU for a ~500M model, $/hr)
-# Prices are the operator's actual quoted rates (2026-07-26). MFU is the honest
+# Prices are the rates actually quoted for this run (2026-07-26). MFU is the honest
 # unknown here — 0.35 is a conservative real-world figure for a model this small
 # (kernel-launch and memory overhead dominate more than at 7B+). Re-measure on the
 # smoke run and edit these numbers rather than trusting them.
