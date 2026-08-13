@@ -30,8 +30,9 @@ import os
 import re
 import sys
 
-PROJECT_ROOT = (r"C:\Users\Daniel\.claude\projects"
-                r"\D--Razer-3D-Models-Etsy-KandiVaultLLC-AI-Claude-Artifacts---Web-projects-LLM")
+from _journal import project_root
+
+PROJECT_ROOT = project_root()
 SAFETY_RUNS = ["wf_bb14b306-418", "wf_11501c44-c1a"]
 
 

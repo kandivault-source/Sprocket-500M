@@ -2,7 +2,9 @@
 import json
 import os
 
-JOURNAL = r"C:\Users\Daniel\.claude\projects\D--Razer-3D-Models-Etsy-KandiVaultLLC-AI-Claude-Artifacts---Web-projects-LLM\92af27b2-e7da-4cf2-a2fc-e61dc39b750d\subagents\workflows\wf_85e660a0-bd8\journal.jsonl"
+from _journal import journal
+
+JOURNAL = journal("92af27b2-e7da-4cf2-a2fc-e61dc39b750d", "wf_85e660a0-bd8")
 OUT_DIR = "data/synthetic"
 os.makedirs(OUT_DIR, exist_ok=True)
 

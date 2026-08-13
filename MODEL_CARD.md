@@ -54,7 +54,7 @@ rely on the model's judgement about when to do that.
 | Stage | Data | Result |
 |---|---|---|
 | Pretrain | **20.0B tokens** FineWeb-Edu (`sample/100BT`) | val loss **2.564** |
-| Instruct (SFT) | 21,371 synthetic conversations, assistant-only loss masking | val loss ~2.1 |
+| Instruct (SFT) | 21,371 synthetic conversations, assistant-only loss masking | val loss **1.840** |
 
 - **54.3 hours on one H100 SXM 80GB**, ~102,500 tokens/second sustained, 35% MFU.
 - Total compute cost about **$165**.
@@ -109,12 +109,29 @@ trained in, but the underlying language model is thin.
 
 ## Files
 
+Everything described on this card is the **instruct** build, exported from
+`500m_sft_final.pt` at step 1192 (see `export_provenance.json`).
+
 | File | Use |
 |---|---|
-| `model.safetensors` | HF format, loads as `LlamaForCausalLM` |
-| `sprocket-500m-q4_k_m.gguf` | ~310 MB — llama.cpp / Ollama / LM Studio / phone |
+| `model.safetensors` | HF format, loads as `LlamaForCausalLM`. The instruct build. |
+| `sprocket-500m-q4_k_m.gguf` | ~310 MB, llama.cpp / Ollama / LM Studio / phone |
 | `sprocket-500m-f16.gguf` | full-precision GGUF |
 | `debug/train.log` | complete training history |
+
+### The `-chat-` files are a different model
+
+| File | Use |
+|---|---|
+| `sprocket-500m-chat-q4_k_m.gguf` | chat-only build, ~310 MB |
+| `sprocket-500m-chat-f16.gguf` | chat-only build, full precision |
+
+These two were fine-tuned separately, starting from the same pretrained base but
+on a 19,435-conversation corpus with **every tool-calling and memory example
+removed**, for 405 steps rather than 1192. They are a plain conversational
+model. The tool-calling result described above does not apply to them, and they
+will not emit `<|tool_call|>`. If you want the behaviour this card documents,
+use `model.safetensors` or the GGUF files without `-chat-` in the name.
 
 ```python
 from transformers import AutoModelForCausalLM, AutoTokenizer

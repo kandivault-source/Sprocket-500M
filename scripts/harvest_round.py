@@ -21,7 +21,9 @@ if len(sys.argv) < 2:
 RUN_IDS = sys.argv[1:]
 
 import glob as _glob
-PROJECT_ROOT = r"C:\Users\Daniel\.claude\projects\D--Razer-3D-Models-Etsy-KandiVaultLLC-AI-Claude-Artifacts---Web-projects-LLM"
+from _journal import project_root
+
+PROJECT_ROOT = project_root()
 
 
 def find_journal(rid):

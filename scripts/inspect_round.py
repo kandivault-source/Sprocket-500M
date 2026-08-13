@@ -27,8 +27,9 @@ import sys
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-PROJECT_ROOT = (r"C:\Users\Daniel\.claude\projects"
-                r"\D--Razer-3D-Models-Etsy-KandiVaultLLC-AI-Claude-Artifacts---Web-projects-LLM")
+from _journal import project_root
+
+PROJECT_ROOT = project_root()
 
 ap = argparse.ArgumentParser()
 ap.add_argument("run_ids", nargs="+")

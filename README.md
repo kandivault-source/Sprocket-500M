@@ -65,6 +65,30 @@ Grouped-query attention at 20:4 was chosen for inference rather than training.
 For a model meant to run on a laptop or a phone, the KV cache is what constrains
 long context, not the weights. Cutting KV heads 5x cuts that cache 5x.
 
+## The run
+
+Every figure below is generated from the run's own log by
+`scripts/plot_figures.py`. Nothing is redrawn by hand.
+
+![Pretraining loss](docs/figures/pretrain-loss.svg)
+
+Pretraining cross-entropy against tokens seen, with the first 1B tokens omitted
+because the collapse out of random initialisation (10.6 down to about 3.9 inside
+the first few percent) compresses everything after it into a flat band. What is
+left is the part that took 54 hours: a long grind from 3.1 to a final validation
+loss of **2.564** at 152,580 steps, with a visible step down as the cosine
+schedule anneals. Validation tracks train the whole way, which at 40 tokens per
+parameter is what you would expect. The model never sees enough repeated data to
+start memorising it.
+
+![Instruct fine-tuning loss](docs/figures/sft-loss.svg)
+
+Instruction fine-tuning over 1,192 steps, roughly 8 epochs of the synthetic
+conversation set, with loss masked to assistant tokens only so the model is
+never scored on predicting the user's turn. Final train 1.604, validation
+**1.840**. The gap opening after about step 600 is the point where further
+epochs stop buying generalisation.
+
 ## Throughput engineering
 
 The first cloud smoke run sustained 63,470 tokens/second at 19% model FLOPs
@@ -83,6 +107,12 @@ absolute difference 9.18e-06 and 100% argmax agreement against the old path.
 VRAM from 62 GB to 43 GB at the same time. It cannot be measured on Windows,
 because the inductor backend needs a C compiler, so this was found only by
 running the sweep on the pod itself.
+
+![Sustained throughput](docs/figures/throughput.svg)
+
+Sustained tokens per second across the whole 20B run. The flat line is the
+result: no thermal decay, no dataloader stalls, no drift over 54 hours. The only
+movement is the compile warmup in the first few minutes.
 
 A full sweep of 11 configurations settled the final choice at context 2048 with
 micro-batch 16. Context 1024 is about 10% faster, but a 1024-token chat model is
@@ -190,12 +220,20 @@ src/tokenizer/            BPE tokenizer training
 scripts/build_corpus.py   streaming FineWeb-Edu download and tokenization
 scripts/export_hf.py      HuggingFace export with logit-parity verification
 scripts/server.py         local dashboard server
+scripts/plot_run.py       parses train.log into an interactive HTML report
+scripts/plot_figures.py   the same charts as standalone SVG, for this README
 cloud/bootstrap.sh        one-shot pod bootstrap: corpus, pretrain, SFT, export, publish
 cloud/RUNPOD.md           cloud setup, measured costs, and the failure modes
 eval/persona_battery.py   22-case behavioural battery
 dashboard/                live training dashboard
 logs/train.log            the complete run log, including the throughput sweep
+logs/run_report.html      generated report: loss, throughput, LR, corpus build
+docs/figures/             generated SVGs used above
 ```
+
+`logs/run_report.html` is a single self-contained file with hover readouts and
+the full data table, built from the same parser. It is the version to open when
+the static figures are not enough.
 
 `scripts/` also holds the planning tools that produced the numbers above:
 `scaling_math.py`, `train_cost.py`, `quality_curve.py`, `memory_math.py` and

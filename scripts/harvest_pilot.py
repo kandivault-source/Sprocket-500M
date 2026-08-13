@@ -14,9 +14,10 @@ import json
 import os
 import sys
 
+from _journal import journal
+
 RUN = sys.argv[1] if len(sys.argv) > 1 else "wf_37758c5f-25d"
-BASE = r"C:\Users\Daniel\.claude\projects\D--Razer-3D-Models-Etsy-KandiVaultLLC-AI-Claude-Artifacts---Web-projects-LLM\bca2d753-d961-4fe8-93a1-62487f1ab070\subagents\workflows"
-JOURNAL = os.path.join(BASE, RUN, "journal.jsonl")
+JOURNAL = journal("bca2d753-d961-4fe8-93a1-62487f1ab070", RUN)
 SYN = "data/synthetic"
 os.makedirs(SYN, exist_ok=True)
 

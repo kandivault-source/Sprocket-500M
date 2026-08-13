@@ -81,6 +81,40 @@ def main_segment(iters):
     return max(segs, key=len) if segs else []
 
 
+# The step counter of the SFT checkpoint that was actually exported and
+# published. models/*/export_provenance.json records it as source_iter.
+SHIPPED_SFT_STEPS = 1192
+
+
+def split_segments(steps):
+    """Split the SFT rows into runs, on each reset of the step counter."""
+    segs, cur = [], []
+    for r in steps:
+        if cur and r["step"] < cur[-1]["step"]:
+            segs.append(cur)
+            cur = []
+        cur.append(r)
+    if cur:
+        segs.append(cur)
+    return segs
+
+
+def sft_segment(steps, total=SHIPPED_SFT_STEPS):
+    """The SFT run that produced the released model.
+
+    The log accumulates every SFT attempt ever made against this volume: smoke
+    runs, two fits that started from random init, several epoch-count
+    experiments, and a later chat-only build that is NOT what was released.
+    Neither "longest" nor "last" picks the right one, so select on the total
+    step count and fall back only if it is absent.
+    """
+    segs = split_segments(steps)
+    for s in segs:
+        if s and s[-1]["total"] == total:
+            return s
+    return segs[-1] if segs else []
+
+
 CSS = """
 *,*::before,*::after{box-sizing:border-box}
 .viz-root{
@@ -184,11 +218,16 @@ def line_chart(series, w=1080, h=300, pad=None, ylabel="", xlabel="",
     if not xs:
         return "<p>no data</p>"
     x0, x1 = min(xs), max(xs)
+    floor = y0
     y0 = min(ys) if y0 is None else y0
     y1 = max(ys) if y1 is None else y1
     span = (y1 - y0) or 1
     y0 -= span * 0.06
     y1 += span * 0.06
+    # Never pad below an explicit floor. A negative tokens/second or a negative
+    # learning-rate tick is meaningless and reads as a bug in the chart.
+    if floor is not None and y0 < floor:
+        y0 = floor
 
     def X(v):
         return pad["l"] + (v - x0) / ((x1 - x0) or 1) * (w - pad["l"] - pad["r"])
@@ -350,19 +389,8 @@ def main():
 </figure>"""
 
     sft_html = ""
-    if steps:
-        seg, cur = [], []
-        for r in steps:
-            if cur and r["step"] < cur[-1]["step"]:
-                seg.append(cur); cur = []
-            cur.append(r)
-        if cur:
-            seg.append(cur)
-        # LAST segment, not longest. The log accumulates every SFT attempt ever
-        # run against this volume - a 465-step smoke run, a 276-step fit that
-        # trained from random init, and the real one. "Longest" would plot the
-        # smoke run; only the most recent segment is the shipped model.
-        sf = seg[-1]
+    sf = sft_segment(steps) if steps else []
+    if sf:
         sft_html = f"""
 <figure>
   <figcaption>Instruct fine-tune (SFT) — loss over the chat corpus</figcaption>

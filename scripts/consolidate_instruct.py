@@ -3,8 +3,10 @@ deduped chat-format file: data/synthetic/sprocket_instruct.jsonl"""
 import json
 import os
 
+from _journal import journal
+
 SYN = "data/synthetic"
-JOURNAL = r"C:\Users\Daniel\.claude\projects\D--Razer-3D-Models-Etsy-KandiVaultLLC-AI-Claude-Artifacts---Web-projects-LLM\92af27b2-e7da-4cf2-a2fc-e61dc39b750d\subagents\workflows\wf_44a22f59-fe6\journal.jsonl"
+JOURNAL = journal("92af27b2-e7da-4cf2-a2fc-e61dc39b750d", "wf_44a22f59-fe6")
 
 
 def find_convos(obj, acc):

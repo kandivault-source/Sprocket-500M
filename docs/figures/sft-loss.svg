@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 250" role="img">
+<line x1="66" x2="1060" y1="204.0" y2="204.0" stroke="#8b949e" stroke-width="1" opacity="0.28"/>
+<text x="57" y="208.0" text-anchor="end" font-size="11" fill="#8b949e">0.69</text>
+<line x1="66" x2="1060" y1="169.2" y2="169.2" stroke="#8b949e" stroke-width="1" opacity="0.28"/>
+<text x="57" y="173.2" text-anchor="end" font-size="11" fill="#8b949e">1.37</text>
+<line x1="66" x2="1060" y1="134.4" y2="134.4" stroke="#8b949e" stroke-width="1" opacity="0.28"/>
+<text x="57" y="138.4" text-anchor="end" font-size="11" fill="#8b949e">2.04</text>
+<line x1="66" x2="1060" y1="99.6" y2="99.6" stroke="#8b949e" stroke-width="1" opacity="0.28"/>
+<text x="57" y="103.6" text-anchor="end" font-size="11" fill="#8b949e">2.71</text>
+<line x1="66" x2="1060" y1="64.8" y2="64.8" stroke="#8b949e" stroke-width="1" opacity="0.28"/>
+<text x="57" y="68.8" text-anchor="end" font-size="11" fill="#8b949e">3.39</text>
+<line x1="66" x2="1060" y1="30.0" y2="30.0" stroke="#8b949e" stroke-width="1" opacity="0.28"/>
+<text x="57" y="34.0" text-anchor="end" font-size="11" fill="#8b949e">4.06</text>
+<text x="66.0" y="222" text-anchor="middle" font-size="11" fill="#8b949e">0</text>
+<text x="264.8" y="222" text-anchor="middle" font-size="11" fill="#8b949e">235</text>
+<text x="463.6" y="222" text-anchor="middle" font-size="11" fill="#8b949e">470</text>
+<text x="662.4" y="222" text-anchor="middle" font-size="11" fill="#8b949e">705</text>
+<text x="861.2" y="222" text-anchor="middle" font-size="11" fill="#8b949e">940</text>
+<text x="1060.0" y="222" text-anchor="middle" font-size="11" fill="#8b949e">1175</text>
+<text x="563" y="242" text-anchor="middle" font-size="11" fill="#8b949e">step</text>
+<text x="10" y="18" font-size="11" fill="#8b949e">loss</text>
+<polyline points="66.0,42.6 87.1,76.0 108.3,88.5 129.4,98.1 150.6,108.9 171.7,107.1 192.9,112.9 214.0,108.9 235.2,118.9 256.3,112.8 277.5,128.9 298.6,117.6 319.8,124.4 340.9,132.8 362.1,136.0 383.2,145.7 404.4,135.7 425.5,142.8 446.7,160.6 467.8,145.9 489.0,149.5 510.1,145.5 531.3,153.6 552.4,151.8 573.6,154.8 594.7,173.4 615.9,147.1 637.0,165.2 658.2,152.8 679.3,167.6 700.5,158.9 721.6,157.8 742.8,158.5 763.9,173.3 785.1,158.9 806.2,163.6 827.4,141.0 848.5,173.6 869.7,149.9 890.8,170.5 912.0,171.6 933.1,168.1 954.3,147.9 975.4,161.7 996.6,194.7 1017.7,164.0 1038.9,167.0 1060.0,156.9" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<polyline points="66.0,39.3 87.1,72.3 108.3,88.6 129.4,93.5 150.6,100.1 171.7,99.7 192.9,106.0 214.0,110.3 235.2,114.0 256.3,115.0 277.5,118.0 298.6,122.1 319.8,118.2 340.9,123.7 362.1,123.9 383.2,128.8 404.4,125.9 425.5,133.0 446.7,131.0 467.8,131.7 489.0,134.2 510.1,132.8 531.3,135.2 552.4,140.2 573.6,141.2 594.7,136.4 615.9,144.7 637.0,139.3 658.2,145.3 679.3,135.3 700.5,144.1 721.6,143.5 742.8,147.4 763.9,146.6 785.1,143.1 806.2,145.0 827.4,144.7 848.5,138.0 869.7,138.9 890.8,142.8 912.0,143.3 933.1,145.9 954.3,138.0 975.4,145.4 996.6,147.8 1017.7,145.0 1038.9,146.5 1060.0,144.7" fill="none" stroke="#f97316" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+
+
+
+</svg>
