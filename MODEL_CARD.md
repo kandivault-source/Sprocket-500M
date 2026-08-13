@@ -22,6 +22,13 @@ goblin engineer-sage persona. Built by an independent developer under
 
 Everything here is measured from the run's own logs. Nothing is estimated.
 
+**[Interactive walkthrough](https://kandivault-source.github.io/Sprocket-500M/)**
+· **[Source and training code](https://github.com/kandivault-source/Sprocket-500M)**
+
+The walkthrough runs the real tokenizer and the real training numbers in your
+browser: how the vocabulary was built, what the model is made of, how it learned,
+and what it cost.
+
 ---
 
 ## ⚠ Read this before using it for anything
@@ -187,3 +194,21 @@ system prompt is for behavioural modifiers (length, tone, format) only.
 - **Safety prompts:** [LibrAI/do-not-answer](https://huggingface.co/datasets/LibrAI/do-not-answer)
   (Apache-2.0) — the risky prompts are theirs; only the responses are ours. No
   harmful prompts were self-generated.
+
+## Where the rest of it is
+
+**[Interactive walkthrough](https://kandivault-source.github.io/Sprocket-500M/)**
+Four sections, everything running client-side: type into the real 32,000-entry
+tokenizer and watch text split into the ids this model was trained on; adjust the
+architecture and see the parameter count and memory move; read the actual loss
+and throughput curves from the run; and work out what a given size and token
+budget costs.
+
+**[Source and training code](https://github.com/kandivault-source/Sprocket-500M)**
+The tokenizer training, the model, the training and fine-tuning loops, the corpus
+builder, the export with its parity check, and the single script that ran the
+whole thing unattended on a rented GPU. Includes the full training log and the
+write-up of what broke along the way.
+
+Apache-2.0. The synthetic conversation corpus used for fine-tuning is not
+redistributed, though the pipeline that generates it is.
